@@ -157,7 +157,8 @@ def calculate_pre_post_delta(pre_df, post_df, history_df=None):
         "Alarm Number",
         "Supplementary Information",
         "Distinguished Name",
-        "Diagnostic Info"
+        "Diagnostic Info",
+        "Severity",
     ]
 
     def make_key(df):
@@ -233,7 +234,8 @@ def calculate_history_delta(history_df: pd.DataFrame, post_history_df: pd.DataFr
         "Alarm Number",
         "Supplementary Information",
         "Distinguished Name",
-        "Diagnostic Info"
+        "Diagnostic Info",
+        "Severity",
     ]
 
     def make_key(df):

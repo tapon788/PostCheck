@@ -42,6 +42,8 @@ DISPLAY_COLUMNS = [
 
 DISPLAY_COLUMNS_NEW = [
     "Severity",
+    "History Match",
+    "History Count",
     "Alarm Time",
     "Cancel Time",
     "Alarm Number",
@@ -50,8 +52,6 @@ DISPLAY_COLUMNS_NEW = [
     "Distinguished Name",
     "Diagnostic Info",
     "Name",
-    "History Match",
-    "History Count",
 ]
 
 def resource_path(relative_path):
@@ -133,14 +133,6 @@ class AlarmTable(QWidget):
 
         self.df = display_df.copy()
 
-        if export_df is None:
-            self.export_df = display_df.copy()
-        else:
-            self.export_df = export_df.copy()
-
-        # preserve original row mapping
-        self.df.index = self.export_df.index
-
         model = PandasModel(
             self.df,
             color
@@ -180,20 +172,18 @@ class AlarmTable(QWidget):
 
         model = self.proxy.sourceModel()
 
-        visible_indexes = []
+        rows = []
 
         for row in range(self.proxy.rowCount()):
             proxy_index = self.proxy.index(row, 0)
 
             source_index = self.proxy.mapToSource(proxy_index)
 
-            visible_indexes.append(
-                model.df.index[source_index.row()]
+            rows.append(
+                model.df.iloc[source_index.row()]
             )
 
-        export_df = self.export_df.loc[
-            visible_indexes
-        ]
+        export_df = pd.DataFrame(rows)
 
         export_df.to_csv(
             file_name,

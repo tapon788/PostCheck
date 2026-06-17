@@ -40,26 +40,23 @@ class PandasModel(QAbstractTableModel):
             return str(value)
 
         if role == Qt.BackgroundRole:
-            if self.df.columns[index.column()] != "Severity":
-                return None
-            severity = self.get_severity(index.row())
+            if self.df.columns[index.column()] == "Severity":
+                severity = self.get_severity(index.row())
+                color_map = {
+                    "critical": QColor("#ff4d4d"),
+                    "major": QColor("#ffa500"),
+                    "minor": QColor("#fff176"),
+                    "warning": QColor("#add8e6"),
+                }
+                return color_map.get(severity, None)
 
-            color_map = {
-                "critical": QColor("#ff4d4d"),
-                "major": QColor("#ffa500"),
-                "minor": QColor("#fff176"),
-                "warning": QColor("#add8e6"),
-            }
-
-            return color_map.get(severity, None)
-            color_map = {
-                "critical": QColor("#ff4d4d"),
-                "major": QColor("#ffa500"),
-                "minor": QColor("#fff176"),
-                "warning": QColor("#add8e6"),
-            }
-
-            return color_map.get(severity, None)
+            if self.df.columns[index.column()] == "History Match":
+                history_match_flag = self.get_history_match_flag(index.row())
+                color_map = {
+                    "true": QColor("#4dff4d"),
+                    "false": QColor("#ff4d4d"),
+                }
+                return color_map.get(history_match_flag, None)
 
         return None
 
@@ -67,6 +64,12 @@ class PandasModel(QAbstractTableModel):
 
         try:
             return str(self.df.iloc[row]["Severity"]).strip().lower()
+        except:
+            return ""
+
+    def get_history_match_flag(self, row):
+        try:
+            return str(self.df.iloc[row]["History Match"]).strip().lower()
         except:
             return ""
 
@@ -129,6 +132,7 @@ class PandasModel(QAbstractTableModel):
             )
 
         self.df = df.reset_index(drop=True)
+
 
         self.layoutChanged.emit()
 
