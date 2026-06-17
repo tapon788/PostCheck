@@ -1,0 +1,16 @@
+*.spec
+*.pyc
+*.exe
+*.xlsx
+*.csv
+*.xlsb
+__pycache__
+*.__pycache__
+resources/*
+Other/*
+dist/*
+build/*
+.idea
+*.db
+*.json
+*.xml.gz
