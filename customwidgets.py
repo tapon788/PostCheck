@@ -21,7 +21,7 @@ class MangoButton(QPushButton):
         icon_path = icon_path.replace("\\", "/")
         # Set icon
         self.setIcon(QIcon(QPixmap(icon_path)))
-        self.setIconSize(QSize(40,40))  # adjust size as needed
+        self.setIconSize(QSize(20,20))  # adjust size as needed
         # Mango skin gradient: light green → yellow → orange
         self.setStyleSheet("""
             QPushButton {
@@ -86,3 +86,19 @@ class MangoMainWindow(QMainWindow):
         super().__init__(*args,**kwargs)
         self.setWindowTitle("Mango Bites")
         #self.resize(1400, 800)
+
+
+class MangoCheckBox(QCheckBox):
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        # Custom mango checkbox without default tick or background
+        self.setStyleSheet("""
+            QCheckBox::indicator {
+                border: 1px solid #FFCA28; /* mango border */
+                border-radius: 4px;
+            }
+            QCheckBox::indicator:checked {
+                background: white;   /* still no fill */
+                border: 6px solid #FFCA28; /* solid mango box when checked */
+            }
+        """)

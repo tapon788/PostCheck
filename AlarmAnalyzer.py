@@ -16,11 +16,11 @@ from PyQt5.QtWidgets import (
     QTableView,
     QMessageBox,
     QSizePolicy,
-    QDateTimeEdit
+    QDateTimeEdit, QDialog, QLineEdit, QMenu, QCheckBox
 
 )
 
-from AlarmComparison.customwidgets import MangoButton, MangoLineEdit, MangoGroupBox, MangoMainWindow
+from AlarmComparison.customwidgets import MangoButton, MangoLineEdit, MangoGroupBox, MangoMainWindow, MangoCheckBox
 
 from AlarmComparison.models import PandasModel,GlobalFilterProxy
 from AlarmComparison.dialogs import DetailDialog
@@ -42,8 +42,6 @@ DISPLAY_COLUMNS = [
 
 DISPLAY_COLUMNS_NEW = [
     "Severity",
-    "History Match",
-    "History Count",
     "Alarm Time",
     "Cancel Time",
     "Alarm Number",
@@ -52,6 +50,10 @@ DISPLAY_COLUMNS_NEW = [
     "Distinguished Name",
     "Diagnostic Info",
     "Name",
+    "History Match",
+    "History Count",
+    "Status",
+    "Resolved",
 ]
 
 def resource_path(relative_path):
@@ -94,7 +96,13 @@ class AlarmTable(QWidget):
         self.table.doubleClicked.connect(
             self.show_details
         )
+        self.table.setContextMenuPolicy(
+            Qt.CustomContextMenu
+        )
 
+        self.table.customContextMenuRequested.connect(
+            self.show_context_menu
+        )
         # Styling only once
         self.table.verticalHeader().setDefaultSectionSize(14)
         self.table.verticalHeader().setVisible(False)
@@ -117,6 +125,341 @@ class AlarmTable(QWidget):
         }
         """)
 
+    def update_status(self, source_index):
+
+        row = self.df.iloc[
+            source_index.row()
+        ]
+
+        # -----------------------------
+        # LOAD EXISTING VALUES
+        # -----------------------------
+        current_status = str(
+            row.get("Status", "")
+        )
+
+        current_resolved = str(
+            row.get("Resolved", "")
+        ).lower() == "true"
+
+        # -----------------------------
+        # OPEN DIALOG WITH VALUES
+        # -----------------------------
+        dlg = StatusDialog()
+
+        dlg.status_edit.setText(
+            current_status
+        )
+
+        dlg.resolved_chk.setChecked(
+            current_resolved
+        )
+
+        if not dlg.exec_():
+            return
+
+        status = dlg.status_edit.text()
+
+        resolved = str(
+            dlg.resolved_chk.isChecked()
+        )
+
+        key_cols = [
+            "Severity",
+            "Alarm Time",
+            "Cancel Time",
+            "Alarm Number",
+            "Supplementary Information",
+            "Distinguished Name",
+            "Diagnostic Info"
+        ]
+
+        file = "alarm_status.csv"
+
+        if os.path.exists(file):
+
+            db = pd.read_csv(
+                file,
+                dtype=str,
+                keep_default_na=False
+            )
+
+        else:
+
+            db = pd.DataFrame(
+                columns=[
+                    "Severity",
+                    "Alarm Time",
+                    "Cancel Time",
+                    "Alarm Number",
+                    "Supplementary Information",
+                    "Distinguished Name",
+                    "Diagnostic Info",
+                    "Status",
+                    "Resolved"
+                ]
+            )
+
+        # -----------------------------
+        # REMOVE OLD ENTRY
+        # -----------------------------
+
+        if not db.empty:
+
+            mask = pd.Series(
+                True,
+                index=db.index
+            )
+
+            for col in key_cols:
+                mask &= (
+                        db[col].astype(str)
+                        ==
+                        str(row[col])
+                )
+
+            db = db[~mask]
+
+        # -----------------------------
+        # ADD UPDATED ENTRY
+        # -----------------------------
+
+        new_row = {
+            "Severity":
+                row["Severity"],
+
+            "Alarm Time":
+                row["Alarm Time"],
+
+            "Cancel Time":
+                row["Cancel Time"],
+
+            "Alarm Number":
+                row["Alarm Number"],
+
+            "Supplementary Information":
+                row["Supplementary Information"],
+
+            "Distinguished Name":
+                row["Distinguished Name"],
+
+            "Diagnostic Info":
+                row["Diagnostic Info"],
+
+            "Status":
+                status,
+
+            "Resolved":
+                resolved
+        }
+
+        db = pd.concat(
+            [
+                db,
+                pd.DataFrame([new_row])
+            ],
+            ignore_index=True
+        )
+
+        db.to_csv(
+            file,
+            index=False
+        )
+
+        # -----------------------------
+        # REFRESH TABLE
+        # -----------------------------
+
+        self.apply_saved_status()
+
+        model = self.proxy.sourceModel()
+
+        if model:
+            model.beginResetModel()
+
+            model.df = self.df.copy()
+
+            model.endResetModel()
+
+        self.table.viewport().update()
+
+    def delete_status(self, source_index):
+
+        row = self.df.iloc[
+            source_index.row()
+        ]
+
+        key_cols = [
+                "Severity",
+                "Alarm Time",
+                "Cancel Time",
+                "Alarm Number",
+                "Supplementary Information",
+                "Distinguished Name",
+                "Diagnostic Info"
+        ]
+
+        file = "alarm_status.csv"
+
+        if not os.path.exists(file):
+            return
+
+        db = pd.read_csv(
+            file,
+            dtype=str,
+            keep_default_na=False
+        )
+
+        if db.empty:
+            return
+
+        # find matching alarm
+
+        mask = pd.Series(
+            True,
+            index=db.index
+        )
+
+        for col in key_cols:
+            mask &= (
+                    db[col].astype(str)
+                    ==
+                    str(row[col])
+            )
+
+        # delete status record
+
+        db = db[~mask]
+
+        db.to_csv(
+            file,
+            index=False
+        )
+
+        # reload dataframe from csv
+
+        self.apply_saved_status()
+
+        # refresh model
+
+        model = self.proxy.sourceModel()
+
+        if model:
+            model.beginResetModel()
+
+            model.df = self.df.copy()
+
+            model.endResetModel()
+
+        self.table.viewport().update()
+
+    def apply_saved_status(self):
+
+        file = "alarm_status.csv"
+
+        key_cols = [
+            "Supplementary Information",
+            "Distinguished Name",
+            "Diagnostic Info"
+        ]
+
+        # make sure columns exist
+        for col in key_cols + ["Status", "Resolved"]:
+
+            if col not in self.df.columns:
+                self.df[col] = ""
+
+        # ALWAYS clear existing values first
+        self.df["Status"] = ""
+        self.df["Resolved"] = ""
+
+        if not os.path.exists(file):
+            return
+
+        db = pd.read_csv(
+            file,
+            dtype=str,
+            keep_default_na=False
+        )
+
+        if db.empty:
+            return
+
+        # create lookup dictionary
+
+        status_lookup = {}
+
+        for _, row in db.iterrows():
+            key = tuple(
+                str(row[col])
+                for col in key_cols
+            )
+
+            status_lookup[key] = {
+
+                "Status":
+                    row.get("Status", ""),
+
+                "Resolved":
+                    row.get("Resolved", "")
+            }
+
+        # apply saved values
+
+        for idx, row in self.df.iterrows():
+
+            key = tuple(
+                str(row[col])
+                for col in key_cols
+            )
+
+            if key in status_lookup:
+                self.df.at[
+                    idx,
+                    "Status"
+                ] = status_lookup[key]["Status"]
+
+                self.df.at[
+                    idx,
+                    "Resolved"
+                ] = status_lookup[key]["Resolved"]
+
+    def show_context_menu(self, pos):
+
+        index = self.table.indexAt(pos)
+
+        if not index.isValid():
+            return
+
+        source_index = self.proxy.mapToSource(index)
+
+        col_name = self.df.columns[
+            source_index.column()
+        ]
+
+        if col_name != "Status":
+            return
+
+        menu = QMenu(self)
+
+        update_action = menu.addAction(
+            "Update Status"
+        )
+
+        delete_action = menu.addAction(
+            "Delete Status"
+        )
+
+        action = menu.exec_(
+            self.table.viewport().mapToGlobal(pos)
+        )
+
+        if action == update_action:
+            self.update_status(source_index)
+
+        elif action == delete_action:
+            self.delete_status(source_index)
+
     def restart_search_timer(self):
         self.search_timer.start()
 
@@ -132,6 +475,7 @@ class AlarmTable(QWidget):
             color=None):
 
         self.df = display_df.copy()
+        self.apply_saved_status()
 
         model = PandasModel(
             self.df,
@@ -190,6 +534,59 @@ class AlarmTable(QWidget):
             index=False
         )
 
+class StatusDialog(QDialog):
+
+    def __init__(
+            self,
+            status="",
+            resolved=False):
+
+        super().__init__()
+        self.setWindowIcon(QIcon(resource_path(
+            "resources/icon/update.ico"
+        )))
+        self.setWindowTitle(
+            "Update Status"
+        )
+        self.resize(600, 200)
+        layout = QVBoxLayout()
+
+        self.status_edit = MangoLineEdit()
+        self.status_edit.setText(status)
+
+        self.resolved_chk = MangoCheckBox(
+            "Resolved"
+        )
+
+        self.resolved_chk.setChecked(
+            resolved
+        )
+
+        save_btn = MangoButton(
+            "", resource_path("resources/icon/save.ico")
+        )
+
+        save_btn.clicked.connect(
+            self.accept
+        )
+
+        layout.addWidget(
+            QLabel("Status")
+        )
+
+        layout.addWidget(
+            self.status_edit
+        )
+
+        layout.addWidget(
+            self.resolved_chk
+        )
+
+        layout.addWidget(
+            save_btn, alignment=Qt.AlignHCenter
+        )
+
+        self.setLayout(layout)
 
 class MainWindow(MangoMainWindow):
 
@@ -893,6 +1290,61 @@ class MainWindow(MangoMainWindow):
             low_memory=False
         )
 
+    def get_status_file(self):
+
+        return "alarm_status.csv"
+
+    def load_status_db(self):
+
+        file = self.get_status_file()
+
+        if not os.path.exists(file):
+            return pd.DataFrame(
+                columns=[
+                    "Supplementary Information",
+                    "Distinguished Name",
+                    "Diagnostic Info",
+                    "Status",
+                    "Resolved"
+                ]
+            )
+
+        return pd.read_csv(
+            file,
+            dtype=str,
+            keep_default_na=False
+        )
+
+    def save_status_db(self, df):
+
+        df.to_csv(
+            self.get_status_file(),
+            index=False
+        )
+
+    def apply_status_to_dataframe(self, df):
+
+        if df.empty:
+            return df
+
+        status_db = self.load_status_db()
+
+        if status_db.empty:
+            df["Status"] = ""
+            df["Resolved"] = ""
+            return df
+
+        merge_cols = [
+            "Supplementary Information",
+            "Distinguished Name",
+            "Diagnostic Info"
+        ]
+
+        return df.merge(
+            status_db,
+            on=merge_cols,
+            how="left"
+        )
     def run_analysis(self):
 
         if not self.ui_loaded:
@@ -960,6 +1412,9 @@ class MainWindow(MangoMainWindow):
                 self.history_df,
                 self.post_history_df
             )
+
+            new_df = self.apply_status_to_dataframe(new_df)
+            hist_new_df = self.apply_status_to_dataframe(hist_new_df)
 
             # ----------------------------
             # 5. LOAD DELTA TABS (PRE/POST)
