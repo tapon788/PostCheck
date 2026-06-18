@@ -260,11 +260,18 @@ class AlarmTable(QWidget):
             ],
             ignore_index=True
         )
-
-        db.to_csv(
-            file,
-            index=False
-        )
+        try:
+            db.to_csv(
+                file,
+                index=False
+            )
+        except PermissionError:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                f"File is open: {file}. Please close it and try again."
+            )
+            #print()
 
         # -----------------------------
         # REFRESH TABLE
@@ -1339,6 +1346,11 @@ class MainWindow(MangoMainWindow):
             "Distinguished Name",
             "Diagnostic Info"
         ]
+        status_cols = merge_cols + [
+            "Status",
+            "Resolved"
+        ]
+        status_db = status_db[status_cols]
 
         return df.merge(
             status_db,
@@ -1405,6 +1417,8 @@ class MainWindow(MangoMainWindow):
                 self.history_df  # IMPORTANT
             )
 
+
+
             # ----------------------------
             # 4. HISTORY DELTA (INDEPENDENT)
             # ----------------------------
@@ -1414,11 +1428,14 @@ class MainWindow(MangoMainWindow):
             )
 
             new_df = self.apply_status_to_dataframe(new_df)
+            print(new_df.columns)
+            print('\n==========================\n')
             hist_new_df = self.apply_status_to_dataframe(hist_new_df)
-
+            print(hist_new_df.columns)
             # ----------------------------
             # 5. LOAD DELTA TABS (PRE/POST)
             # ----------------------------
+
             self.new_tab.load_dataframe(
                 safe_display(new_df, DISPLAY_COLUMNS_NEW),
                 new_df,
