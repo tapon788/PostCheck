@@ -194,11 +194,30 @@ def calculate_pre_post_delta(pre_df, post_df, history_df=None):
 
         # NEW DF enrichment
         new_df["History Count"] = new_df["_KEY"].map(history_counts).fillna(0).astype(int)
-        new_df["History Match"] = new_df["_KEY"].isin(history_set)
+        #new_df["History Match"] = new_df["_KEY"].isin(history_set)
+
+        new_df["History Match"] = (
+            new_df["_KEY"]
+            .isin(history_set)
+            .map({
+                True: "Exists",
+                False: "Not Found"
+            })
+        )
 
         # CLEARED DF enrichment
         cleared_df["History Count"] = cleared_df["_KEY"].map(history_counts).fillna(0).astype(int)
-        cleared_df["History Match"] = cleared_df["_KEY"].isin(history_set)
+        #cleared_df["History Match"] = cleared_df["_KEY"].isin(history_set)
+
+        cleared_df["History Match"] = (
+            cleared_df["_KEY"]
+            .isin(history_set)
+            .map({
+                True: "Exists",
+                False: "Not Found"
+            })
+        )
+
 
     else:
         new_df["History Count"] = 0

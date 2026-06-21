@@ -4,7 +4,7 @@ from PyQt5.QtCore import (
     QSortFilterProxyModel
 )
 
-from PyQt5.QtGui import QColor
+from PyQt5.QtGui import QColor, QIcon
 
 import pandas as pd
 
@@ -19,8 +19,9 @@ class PandasModel(QAbstractTableModel):
         "Origin Cancel Time",
     }
 
-    def __init__(self, df, color=None):
+    def __init__(self, df, color=None, table_name=None):
         super().__init__()
+        self.table_name = table_name
         self.df = df.copy()   # ✅ FIX: use same attribute everywhere
         self.row_color = color
 
@@ -35,28 +36,68 @@ class PandasModel(QAbstractTableModel):
         if not index.isValid():
             return None
 
+        column_name = self.df.columns[index.column()]
+
+        # -----------------------------
+        # RESOLVED ICON
+        # -----------------------------
+        if role == Qt.DecorationRole:
+
+            if column_name == "Resolved":
+
+                status = str(
+                    self.df.iloc[index.row()]["Resolved"]
+                ).strip().lower()
+                history_match = self.get_history_match_flag(index.row())
+
+                if status == "true":
+                    return QIcon("resources/icon/resolved2.png")
+
+
+                elif status in ("false", ""):
+                    if history_match == "not found":
+                        return QIcon("resources/icon/NotResolved.png")
+                    if self.table_name == "history_delta_new_table":
+                        return QIcon("resources/icon/NotResolved.png")
+        # -----------------------------
+        # DISPLAY TEXT
+        # -----------------------------
         if role == Qt.DisplayRole:
+
+            if column_name == "Resolved":
+                return ""
+
             value = self.df.iloc[index.row(), index.column()]
+            if value == 'nan':
+                return ""
             return str(value)
 
+        # -----------------------------
+        # BACKGROUND
+        # -----------------------------
         if role == Qt.BackgroundRole:
-            if self.df.columns[index.column()] == "Severity":
+
+            if column_name == "Severity":
                 severity = self.get_severity(index.row())
+
                 color_map = {
                     "critical": QColor("#ff4d4d"),
                     "major": QColor("#ffa500"),
                     "minor": QColor("#fff176"),
                     "warning": QColor("#add8e6"),
                 }
-                return color_map.get(severity, None)
 
-            if self.df.columns[index.column()] == "History Match":
-                history_match_flag = self.get_history_match_flag(index.row())
+                return color_map.get(severity)
+
+            if column_name == "History Match":
+                history_match = self.get_history_match_flag(index.row())
+
                 color_map = {
-                    "true": QColor("#4dff4d"),
-                    "false": QColor("#ff4d4d"),
+                    "exists": QColor("#bdffbd"),
+                    "not found": QColor("#eecdcd"),
                 }
-                return color_map.get(history_match_flag, None)
+
+                return color_map.get(history_match)
 
         return None
 
@@ -173,8 +214,11 @@ class GlobalFilterProxy(QSortFilterProxyModel):
                 return True
 
         return False
+    #
+    # def sort(self, column, order):
+    #     source = self.sourceModel()
+    #     if source:
+    #         source.sort(column, order)
 
     def sort(self, column, order):
-        source = self.sourceModel()
-        if source:
-            source.sort(column, order)
+        super().sort(column, order)

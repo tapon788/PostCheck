@@ -16,59 +16,63 @@ from PyQt5.QtWidgets import (
     QTableView,
     QMessageBox,
     QSizePolicy,
-    QDateTimeEdit, QDialog, QLineEdit, QMenu, QCheckBox
+    QDateTimeEdit, QDialog, QLineEdit, QMenu, QCheckBox, QInputDialog, QComboBox,
+    QHeaderView
 
 )
 
-from AlarmComparison.customwidgets import MangoButton, MangoLineEdit, MangoGroupBox, MangoMainWindow, MangoCheckBox
+from AlarmComparison.customwidgets import (
+    MangoButton,
+    MangoLineEdit,
+    MangoGroupBox,
+    MangoMainWindow,
+    MangoCheckBox,
+)
 
 from AlarmComparison.models import PandasModel,GlobalFilterProxy
 from AlarmComparison.dialogs import DetailDialog
 from AlarmComparison.delta import calculate_pre_post_delta, calculate_history_delta
-
-
+from AlarmComparison.customUIs import CSVMergerDialog
+from AlarmComparison.helper_functions import resource_path
 
 DISPLAY_COLUMNS = [
     "Severity",
-    "Alarm Time",
-    "Cancel Time",
     "Alarm Number",
-    "Alarm Text",
     "Supplementary Information",
     "Distinguished Name",
+    "Alarm Time",
+    "Alarm Text",
     "Diagnostic Info",
     "Name",
 ]
 
 DISPLAY_COLUMNS_NEW = [
     "Severity",
-    "Alarm Time",
-    "Cancel Time",
     "Alarm Number",
-    "Alarm Text",
     "Supplementary Information",
     "Distinguished Name",
-    "Diagnostic Info",
-    "Name",
+    "Alarm Time",
     "History Match",
-    "History Count",
     "Status",
     "Resolved",
+    "Cancel Time",
+    "Alarm Text",
+    "Diagnostic Info",
+    "Name",
+    "History Count",
 ]
 
-def resource_path(relative_path):
-    base_path = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))
-    return relative_path
-    return os.path.join(base_path, relative_path)
+
 
 
 class AlarmTable(QWidget):
     filterChanged = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, filename=None):
         super().__init__()
+        self.enable_status_tracking = False
         self.df = pd.DataFrame()
-
+        self.filename = filename
         self.search = MangoLineEdit()
         self.search.setPlaceholderText("Search...")
         self.search_timer = QTimer()
@@ -174,7 +178,7 @@ class AlarmTable(QWidget):
             "Diagnostic Info"
         ]
 
-        file = "alarm_status.csv"
+        file = f"{self.filename}.csv"
 
         if os.path.exists(file):
 
@@ -306,7 +310,7 @@ class AlarmTable(QWidget):
                 "Diagnostic Info"
         ]
 
-        file = "alarm_status.csv"
+        file = f"{self.filename}.csv"
 
         if not os.path.exists(file):
             return
@@ -337,11 +341,17 @@ class AlarmTable(QWidget):
         # delete status record
 
         db = db[~mask]
-
-        db.to_csv(
-            file,
-            index=False
-        )
+        try:
+            db.to_csv(
+                file,
+                index=False
+            )
+        except PermissionError:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                f"File is open: {file}. Please close it and try again."
+            )
 
         # reload dataframe from csv
 
@@ -360,9 +370,80 @@ class AlarmTable(QWidget):
 
         self.table.viewport().update()
 
+    def clear_all_status(self):
+
+        reply = QMessageBox.question(
+            self,
+            "Confirm Clear",
+            "Are you sure you want to clear all alarm status?\n\nThis action cannot be undone.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No
+        )
+
+        if reply != QMessageBox.Yes:
+            return
+
+        file = f"{self.filename}.csv"
+
+        # -----------------------------
+        # CLEAR CSV
+        # -----------------------------
+        try:
+            if os.path.exists(file):
+                pd.DataFrame(
+                    columns=[
+                        "Severity",
+                        "Alarm Time",
+                        "Cancel Time",
+                        "Alarm Number",
+                        "Supplementary Information",
+                        "Distinguished Name",
+                        "Diagnostic Info",
+                        "Status",
+                        "Resolved"
+                    ]
+                ).to_csv(
+                    file,
+                    index=False
+                )
+
+        except PermissionError:
+            QMessageBox.warning(
+            self,
+            "Warning",
+            f"File is open: {file}. Please close it and try again."
+            )
+            return
+        # -----------------------------
+        # CLEAR TABLE DATA
+        # -----------------------------
+        if "Status" in self.df.columns:
+            self.df["Status"] = ""
+
+        if "Resolved" in self.df.columns:
+            self.df["Resolved"] = ""
+
+        # -----------------------------
+        # REFRESH TABLE
+        # -----------------------------
+        model = self.proxy.sourceModel()
+
+        if model:
+            model.beginResetModel()
+            model.df = self.df.copy()
+            model.endResetModel()
+
+        self.table.viewport().update()
+
+    def open_status_file(self):
+        filename = f"{self.filename}.csv"
+        os.startfile(filename)
+
     def apply_saved_status(self):
 
-        file = "alarm_status.csv"
+        if not self.enable_status_tracking:
+            return
+        file = f"{self.filename}.csv"
 
         key_cols = [
             "Supplementary Information",
@@ -432,7 +513,8 @@ class AlarmTable(QWidget):
                 ] = status_lookup[key]["Resolved"]
 
     def show_context_menu(self, pos):
-
+        if not self.enable_status_tracking:
+            return
         index = self.table.indexAt(pos)
 
         if not index.isValid():
@@ -453,9 +535,16 @@ class AlarmTable(QWidget):
             "Update Status"
         )
 
-        delete_action = menu.addAction(
-            "Delete Status"
+        update_action.setIcon(QIcon(resource_path('resources/icon/update.ico')))
+        open_status_action = menu.addAction(
+            "Open Status DB"
         )
+        open_status_action.setIcon(QIcon(resource_path('resources/icon/open.ico')))
+        clear_all_status_action = menu.addAction(
+            "Clear All Status"
+        )
+        clear_all_status_action.setIcon(QIcon(resource_path('resources/icon/trash.ico')))
+
 
         action = menu.exec_(
             self.table.viewport().mapToGlobal(pos)
@@ -464,8 +553,12 @@ class AlarmTable(QWidget):
         if action == update_action:
             self.update_status(source_index)
 
-        elif action == delete_action:
-            self.delete_status(source_index)
+
+        elif action == clear_all_status_action:
+            self.clear_all_status()
+
+        elif action == open_status_action:
+            self.open_status_file()
 
     def restart_search_timer(self):
         self.search_timer.start()
@@ -475,18 +568,15 @@ class AlarmTable(QWidget):
         self.proxy.setSearch(text)
         self.filterChanged.emit()
 
-    def load_dataframe(
-            self,
-            display_df,
-            export_df=None,
-            color=None):
+    def load_dataframe(self,tablename, display_df,export_df=None, color=None):
 
         self.df = display_df.copy()
         self.apply_saved_status()
 
         model = PandasModel(
             self.df,
-            color
+            color,
+            table_name=tablename
         )
 
         self.proxy.setSourceModel(model)
@@ -494,6 +584,12 @@ class AlarmTable(QWidget):
         self.table.setModel(self.proxy)
 
         self.table.resizeColumnsToContents()
+        self.resize_cols("Severity", 30)
+        self.resize_cols("Alarm Number", 85)
+        self.resize_cols("Supplementary Information", 250)
+        self.resize_cols("Status", 400)
+        #self.resize_cols("Resolved", 30)
+
 
     def show_details(self, index):
 
@@ -540,6 +636,17 @@ class AlarmTable(QWidget):
             file_name,
             index=False
         )
+
+    def resize_cols(self, headername, width):
+        header = self.table.horizontalHeader()
+        header_name = headername
+        model = self.table.model()
+
+        for col in range(model.columnCount()):
+            if model.headerData(col, Qt.Horizontal) == header_name:
+                self.table.setColumnWidth(col, width)
+                header.setSectionResizeMode(col, QHeaderView.Interactive)
+                break
 
 class StatusDialog(QDialog):
 
@@ -599,16 +706,16 @@ class MainWindow(MangoMainWindow):
 
     def __init__(self):
         super().__init__()
-
+        self.session = "statusFile"
         # -----------------------------
         # WINDOW
         # -----------------------------
         icon_path = resource_path(
-            "resources/icon/alarm.ico"
+            "resources/icon/delta.ico"
         )
 
         self.setWindowIcon(QIcon(icon_path))
-        self.setWindowTitle("Alarm Analyzer")
+        self.setWindowTitle("PostCheck Analyzer")
 
         # -----------------------------
         # DATA
@@ -675,7 +782,10 @@ class MainWindow(MangoMainWindow):
         # -----------------------------
         self.setAcceptDrops(True)
 
+
+
     def load_analyzer_ui(self):
+
 
         if self.ui_loaded:
             self.show_input_tab()
@@ -689,16 +799,16 @@ class MainWindow(MangoMainWindow):
         # -----------------------------
         # MAIN TABLES
         # -----------------------------
-        self.pre_tab = AlarmTable()
-        self.post_tab = AlarmTable()
-        self.history_tab = AlarmTable()
-        self.post_history_tab = AlarmTable()
+        self.pre_tab = AlarmTable(filename=self.session)
+        self.post_tab = AlarmTable(filename=self.session)
+        self.history_tab = AlarmTable(filename=self.session)
+        self.post_history_tab = AlarmTable(filename=self.session)
 
         # -----------------------------
         # DELTA TABS
         # -----------------------------
-        self.new_tab = AlarmTable()
-        self.cleared_tab = AlarmTable()
+        self.new_tab = AlarmTable(filename=self.session)
+        self.cleared_tab = AlarmTable(filename=self.session)
 
         self.delta_tabs = QTabWidget()
         self.delta_tabs.addTab(self.new_tab, "New")
@@ -707,8 +817,8 @@ class MainWindow(MangoMainWindow):
         # -----------------------------
         # HISTORY DELTA TABS
         # -----------------------------
-        self.hist_new_tab = AlarmTable()
-        self.hist_cleared_tab = AlarmTable()
+        self.hist_new_tab = AlarmTable(filename=self.session)
+        self.hist_cleared_tab = AlarmTable(filename=self.session)
 
         self.history_delta_tabs = QTabWidget()
         self.history_delta_tabs.addTab(self.hist_new_tab, "New")
@@ -728,10 +838,26 @@ class MainWindow(MangoMainWindow):
         # -----------------------------
         # HISTORY FILTER TAB
         # -----------------------------
-        self.history_filter_tab = AlarmTable()
+        self.history_filter_tab = AlarmTable(filename=self.session)
 
         self.create_history_analysis_tab()
 
+        # -----------------------------
+        # STATUS TRACKING
+        # -----------------------------
+        self.pre_tab.enable_status_tracking = False
+        self.post_tab.enable_status_tracking = False
+        self.history_tab.enable_status_tracking = False
+        self.post_history_tab.enable_status_tracking = False
+
+        self.new_tab.enable_status_tracking = True
+
+        self.cleared_tab.enable_status_tracking = False
+        self.hist_new_tab.enable_status_tracking = True
+        self.hist_cleared_tab.enable_status_tracking = False
+
+        # History Analysis table
+        self.history_filter_tab.enable_status_tracking = False
         # -----------------------------
         # SIGNALS
         # -----------------------------
@@ -757,7 +883,16 @@ class MainWindow(MangoMainWindow):
         # -----------------------------
         self.ui_loaded = True
 
+
+
         self.show_input_tab()
+
+    def load_csv_merger_ui(self):
+
+        dlg = CSVMergerDialog()
+
+        dlg.exec_()
+
 
     def create_menu(self):
 
@@ -766,7 +901,7 @@ class MainWindow(MangoMainWindow):
         # -------------------------
         # ANALYZER MENU
         # -------------------------
-        analyzer_menu = menubar.addMenu("&Analyzer")
+        analyzer_menu = menubar.addMenu("&Alarm Analyzer")
 
         browse_action = analyzer_menu.addAction(
             "Browse Input Files"
@@ -780,6 +915,19 @@ class MainWindow(MangoMainWindow):
             self.load_analyzer_ui
         )
 
+        mergefile_action = analyzer_menu.addAction(
+            "Merge Alarm Files"
+        )
+
+        mergefile_action.setIcon(
+            QIcon(resource_path("resources/icon/merge.png"))
+        )
+
+        mergefile_action.triggered.connect(
+            self.load_csv_merger_ui
+        )
+
+
         analyzer_menu.addSeparator()
 
         exit_action = analyzer_menu.addAction(
@@ -792,6 +940,7 @@ class MainWindow(MangoMainWindow):
         exit_action.triggered.connect(
             self.close
         )
+
 
         # -------------------------
         # HELP MENU
@@ -814,15 +963,15 @@ class MainWindow(MangoMainWindow):
 
             if self.tabs.tabText(i) == "Input":
                 self.tabs.setCurrentIndex(i)
-
                 return
+
     def show_about(self):
 
         QMessageBox.about(
             self,
-            "About Alarm Analyzer",
+            "About PostCheck Analyzer",
             """
-            <h3>Alarm Analyzer</h3>
+            <h3>PostCheck Analyzer</h3>
 
             <p><b>Version:</b> 1.0</p>
 
@@ -833,12 +982,12 @@ class MainWindow(MangoMainWindow):
 
             <p>
             <b>Email:</b><br>
-            test.paul@test.com
+            tapon.paul@nokia.com
             </p>
 
             <p>
             <b>Phone:</b><br>
-            +880XXXXXXXX
+            +8801919045275
             </p>
 
             <p>
@@ -1076,6 +1225,7 @@ class MainWindow(MangoMainWindow):
         # LOAD INTO TABLE
         # -----------------------------
         self.history_filter_tab.load_dataframe(
+            "history_filter",
             display_df,
             result,
             "#fff2cc"
@@ -1151,12 +1301,13 @@ class MainWindow(MangoMainWindow):
             )
 
         self.status_bar.showMessage(
-            f"Pre: {pre_count}  |  "
-            f"Post: {post_count}  |  "
-            f"History: {history_count}  |  "
+            f"Pre Active: {pre_count}  |  "
+            f"Post Active: {post_count}  |  "
+            f"Newly Active: {new_count}  |  "
+            f"Post Cleared: {cleared_count} | "
+            f"Pre History: {history_count}  |  "
             f"Post History: {post_history_count}  |  "
-            f"New: {new_count}  |  "
-            f"Cleared: {cleared_count} "
+            
             f"{current_text}"
         )
 
@@ -1166,11 +1317,11 @@ class MainWindow(MangoMainWindow):
         layout = QVBoxLayout()
 
         # ---------------- PRE ALARM ----------------
-        pre_group = MangoGroupBox("Pre Alarm File")
+        pre_group = MangoGroupBox("Pre Active Alarm File")
         pre_layout = QHBoxLayout()
 
         self.pre_edit = MangoLineEdit()
-        self.pre_edit.setPlaceholderText("Select Pre Alarm CSV")
+        self.pre_edit.setPlaceholderText("Browse pre active alarms ...")
 
         pre_btn = QPushButton("Browse")
         pre_btn.clicked.connect(lambda: self.browse(self.pre_edit))
@@ -1179,15 +1330,18 @@ class MainWindow(MangoMainWindow):
         pre_layout.addWidget(pre_btn)
 
         pre_group.setLayout(pre_layout)
+        pre_group.setToolTip("Browse an input file that contains the active alarms after the activity"
+                              "\nFor automatic file detection in drag and drop, use keyword [pre] anywhere "
+                              "in the filename")
         layout.addWidget(pre_group)
 
         # ---------------- POST ALARM ----------------
-        post_group = MangoGroupBox("Post Alarm File")
+        post_group = MangoGroupBox("Post Active Alarm File")
         pre_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         post_layout = QHBoxLayout()
 
         self.post_edit = MangoLineEdit()
-        self.post_edit.setPlaceholderText("Select Post Alarm CSV")
+        self.post_edit.setPlaceholderText("Browse post active alarms ...")
 
         post_btn = QPushButton("Browse")
         post_btn.clicked.connect(lambda: self.browse(self.post_edit))
@@ -1197,15 +1351,19 @@ class MainWindow(MangoMainWindow):
 
         post_group.setLayout(post_layout)
         post_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
+        post_group.setToolTip("Browse an input file that contains the active alarms after the activity"
+                              "\nFor automatic file detection in drag and drop, use keyword [post] anywhere "
+                              "in the filename")
+
         layout.addWidget(post_group)
 
         # ---------------- HISTORY ALARM ----------------
-        hist_group = MangoGroupBox("History Alarm File")
+        hist_group = MangoGroupBox("Pre History Alarm File")
         hist_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         hist_layout = QHBoxLayout()
 
         self.hist_edit = MangoLineEdit()
-        self.hist_edit.setPlaceholderText("Select History Alarm CSV")
+        self.hist_edit.setPlaceholderText("Browse pre history alarms ...")
 
         hist_btn = QPushButton("Browse")
         hist_btn.clicked.connect(lambda: self.browse(self.hist_edit))
@@ -1214,6 +1372,9 @@ class MainWindow(MangoMainWindow):
         hist_layout.addWidget(hist_btn)
 
         hist_group.setLayout(hist_layout)
+        hist_group.setToolTip("Browse an input file that contains the history alarms before the activity"
+                              "\nFor automatic file detection in drag and drop, use keyword [his] anywhere "
+                              "in the filename")
         layout.addWidget(hist_group)
 
 
@@ -1223,7 +1384,7 @@ class MainWindow(MangoMainWindow):
         post_hist_layout = QHBoxLayout()
 
         self.post_hist_edit = MangoLineEdit()
-        self.post_hist_edit.setPlaceholderText("Select History Alarm CSV")
+        self.post_hist_edit.setPlaceholderText("Browse post history alarms ...")
 
         post_hist_btn = QPushButton("Browse")
         post_hist_btn.clicked.connect(lambda: self.browse(self.post_hist_edit))
@@ -1232,6 +1393,9 @@ class MainWindow(MangoMainWindow):
         post_hist_layout.addWidget(post_hist_btn)
 
         post_hist_group.setLayout(post_hist_layout)
+        post_hist_group.setToolTip("Browse an input file that contains the history alarms after the activity"
+                              "\nFor automatic file detection in drag and drop, use keyword [latest] anywhere "
+                              "in the filename")
         layout.addWidget(post_hist_group)
 
         # ---------------- RUN BUTTON ----------------
@@ -1299,7 +1463,7 @@ class MainWindow(MangoMainWindow):
 
     def get_status_file(self):
 
-        return "alarm_status.csv"
+        return f"{self.session}.csv"
 
     def load_status_db(self):
 
@@ -1358,7 +1522,7 @@ class MainWindow(MangoMainWindow):
             how="left"
         )
     def run_analysis(self):
-
+        x=1
         if not self.ui_loaded:
             QMessageBox.warning(
                 self,
@@ -1370,6 +1534,9 @@ class MainWindow(MangoMainWindow):
             # ----------------------------
             # 1. LOAD FILES (SAFE)
             # ----------------------------
+
+
+
             self.pre_df = self.load_csv_if_exists(self.pre_edit.text())
             self.post_df = self.load_csv_if_exists(self.post_edit.text())
             self.history_df = self.load_csv_if_exists(self.hist_edit.text())
@@ -1387,25 +1554,33 @@ class MainWindow(MangoMainWindow):
             # 2. LOAD MAIN TABLES
             # ----------------------------
             self.pre_tab.load_dataframe(
+                "pre_table",
                 safe_display(self.pre_df, DISPLAY_COLUMNS),
-                self.pre_df
+                self.pre_df,
+
             )
 
             self.post_tab.load_dataframe(
+                "post_table",
                 safe_display(self.post_df, DISPLAY_COLUMNS),
-                self.post_df
+                self.post_df,
+
             )
 
             self.history_tab.load_dataframe(
+                "history_table",
                 safe_display(self.history_df, DISPLAY_COLUMNS),
-                self.history_df
+                self.history_df,
+
             )
             # -----------------------------
             # POST HISTORY TABLE
             # -----------------------------
             self.post_history_tab.load_dataframe(
+                "post_history",
                 safe_display(self.post_history_df, DISPLAY_COLUMNS),
-                self.post_history_df
+                self.post_history_df,
+
             )
 
             # ----------------------------
@@ -1428,39 +1603,49 @@ class MainWindow(MangoMainWindow):
             )
 
             new_df = self.apply_status_to_dataframe(new_df)
-            print(new_df.columns)
-            print('\n==========================\n')
+
+
             hist_new_df = self.apply_status_to_dataframe(hist_new_df)
-            print(hist_new_df.columns)
+
             # ----------------------------
             # 5. LOAD DELTA TABS (PRE/POST)
             # ----------------------------
 
             self.new_tab.load_dataframe(
+                "active_delta_new_table",
                 safe_display(new_df, DISPLAY_COLUMNS_NEW),
                 new_df,
-                "#d4ffd4"
+                "#d4ffd4",
+
             )
+            self.new_tab.apply_saved_status()
 
             self.cleared_tab.load_dataframe(
+                "active_delta_cleared_table",
                 safe_display(cleared_df, DISPLAY_COLUMNS),
                 cleared_df,
-                "#ffd4d4"
+                "#ffd4d4",
+
             )
 
             # ----------------------------
             # 6. LOAD HISTORY DELTA TABS
             # ----------------------------
             self.hist_new_tab.load_dataframe(
+                "history_delta_new_table",
                 safe_display(hist_new_df, DISPLAY_COLUMNS_NEW),
                 hist_new_df,
-                "#d4ffd4"
+                "#d4ffd4",
+
+
             )
 
             self.hist_cleared_tab.load_dataframe(
+                "history_delta_cleared_table",
                 safe_display(hist_cleared_df, DISPLAY_COLUMNS),
                 hist_cleared_df,
-                "#ffd4d4"
+                "#ffd4d4",
+
             )
 
             # ----------------------------
@@ -1530,7 +1715,15 @@ class MainWindow(MangoMainWindow):
 if __name__ == "__main__":
     print(resource_path("resources/icon/export.png"))
     app = QApplication(sys.argv)
-
+    app.setStyleSheet("""
+    QToolTip {
+        background-color: #2b2b2b;
+        color: white;
+        border: 1px solid #808080;
+        padding: 4px;
+        font-size: 10pt;
+    }
+    """)
     window = MainWindow()
     window.resize(1000,800)
     window.show()

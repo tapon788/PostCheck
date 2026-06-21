@@ -1,6 +1,6 @@
 import os
 from PyQt5.QtWidgets import (
-    QMainWindow, QPushButton, QLineEdit, QCheckBox,
+    QMainWindow, QPushButton, QLineEdit, QCheckBox, QLabel,
     QComboBox, QGroupBox, QMenu, QAction, QMenuBar, QApplication,
     QTableWidget
 )
@@ -102,3 +102,4 @@ class MangoCheckBox(QCheckBox):
                 border: 6px solid #FFCA28; /* solid mango box when checked */
             }
         """)
+
