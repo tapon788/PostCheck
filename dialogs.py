@@ -1,13 +1,78 @@
+
+
+from PyQt5.QtWidgets import  QTextEdit
+
+from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt, QDateTime, QTimer
 from PyQt5.QtWidgets import (
+    QVBoxLayout,
+    QLabel,
     QDialog,
-    QTextEdit,
-    QVBoxLayout
+
 )
 
+from AlarmComparison.customwidgets import (
+    MangoButton,
+    MangoLineEdit,
+    MangoCheckBox,
+)
 
-from PyQt5.QtWidgets import QDialog, QTextEdit, QVBoxLayout
+from AlarmComparison.helper_functions import resource_path
 
-from PyQt5.QtWidgets import QDialog, QTextEdit, QVBoxLayout
+
+class StatusDialog(QDialog):
+
+    def __init__(
+            self,
+            status="",
+            resolved=False):
+
+        super().__init__()
+        self.setWindowIcon(QIcon(resource_path(
+            "resources/icon/update.ico"
+        )))
+        self.setWindowTitle(
+            "Update Status"
+        )
+        self.resize(600, 200)
+        layout = QVBoxLayout()
+
+        self.status_edit = MangoLineEdit()
+        self.status_edit.setText(status)
+
+        self.resolved_chk = MangoCheckBox(
+            "Resolved"
+        )
+
+        self.resolved_chk.setChecked(
+            resolved
+        )
+
+        save_btn = MangoButton(
+            "", resource_path("resources/icon/save.ico")
+        )
+
+        save_btn.clicked.connect(
+            self.accept
+        )
+
+        layout.addWidget(
+            QLabel("Status")
+        )
+
+        layout.addWidget(
+            self.status_edit
+        )
+
+        layout.addWidget(
+            self.resolved_chk
+        )
+
+        layout.addWidget(
+            save_btn, alignment=Qt.AlignHCenter
+        )
+
+        self.setLayout(layout)
 
 
 class DetailDialog(QDialog):
