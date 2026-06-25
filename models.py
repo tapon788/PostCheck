@@ -8,6 +8,8 @@ from PyQt5.QtGui import QColor, QIcon
 
 import pandas as pd
 
+from AlarmComparison.helper_functions import resource_path
+
 class PandasModel(QAbstractTableModel):
 
     DATE_COLUMNS = {
@@ -51,14 +53,14 @@ class PandasModel(QAbstractTableModel):
                 history_match = self.get_history_match_flag(index.row())
 
                 if status == "true":
-                    return QIcon("resources/icon/resolved2.png")
+                    return QIcon(resource_path("resources/icon/resolved2.png"))
 
 
                 elif status in ("false", ""):
                     if history_match == "not found":
-                        return QIcon("resources/icon/NotResolved.png")
+                        return QIcon(resource_path("resources/icon/NotResolved.png"))
                     if self.table_name == "history_delta_new_table":
-                        return QIcon("resources/icon/NotResolved.png")
+                        return QIcon(resource_path("resources/icon/NotResolved.png"))
         # -----------------------------
         # DISPLAY TEXT
         # -----------------------------

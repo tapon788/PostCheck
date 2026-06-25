@@ -437,7 +437,14 @@ class AlarmTable(QWidget):
 
     def open_status_file(self):
         filename = f"{self.filename}.csv"
-        os.startfile(filename)
+        try:
+            os.startfile(filename)
+        except FileNotFoundError:
+            QMessageBox.warning(
+                self,
+                "Warning",
+                f"{filename} Does not exit. Try to create it using update status"
+            )
 
     def apply_saved_status(self):
 
@@ -1330,7 +1337,7 @@ class MainWindow(MangoMainWindow):
         pre_layout.addWidget(pre_btn)
 
         pre_group.setLayout(pre_layout)
-        pre_group.setToolTip("Browse an input file that contains the active alarms after the activity"
+        pre_group.setToolTip("Browse an input file that contains the active alarms before the activity"
                               "\nFor automatic file detection in drag and drop, use keyword [pre] anywhere "
                               "in the filename")
         layout.addWidget(pre_group)
@@ -1713,7 +1720,7 @@ class MainWindow(MangoMainWindow):
         self.tabs.setCurrentIndex(0)
 
 if __name__ == "__main__":
-    print(resource_path("resources/icon/export.png"))
+
     app = QApplication(sys.argv)
     app.setStyleSheet("""
     QToolTip {
