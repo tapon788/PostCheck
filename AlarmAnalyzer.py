@@ -6,6 +6,7 @@ from PyQt5.QtCore import Qt, QDateTime
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
+    QStackedWidget,
     QFileDialog,
     QVBoxLayout,
     QHBoxLayout,
@@ -57,11 +58,24 @@ DISPLAY_COLUMNS_NEW = [
     "History Count",
 ]
 
-
-class MainWindow(MangoMainWindow):
-
-    def __init__(self):
+class AlarmAnalyzerWidget(QWidget):
+    def __init__(self, status_bar):
         super().__init__()
+        self.status_bar = status_bar
+
+        # -----------------------------
+        # UI STATE
+        # -----------------------------
+        #self.ui_loaded = False
+
+        layout = QVBoxLayout(self)
+        # -----------------------------
+        # MAIN TAB CONTROL
+        # -----------------------------
+        self.tabs = QTabWidget()
+
+        layout.addWidget(self.tabs)
+        #self.setCentralWidget(self.tabs)
         self.session = "statusFile"
         # -----------------------------
         # WINDOW
@@ -82,18 +96,7 @@ class MainWindow(MangoMainWindow):
         self.post_history_df = pd.DataFrame()
         self.history_source_path = ""
         self.history_source_df = pd.DataFrame()
-        # -----------------------------
-        # UI STATE
-        # -----------------------------
-        self.ui_loaded = False
 
-        # -----------------------------
-        # MAIN TAB CONTROL
-        # -----------------------------
-        self.tabs = QTabWidget()
-
-
-        self.setCentralWidget(self.tabs)
 
 
         self.tabs.setStyleSheet("""
@@ -122,30 +125,25 @@ class MainWindow(MangoMainWindow):
         # -----------------------------
         # STATUS BAR
         # -----------------------------
-        self.status_bar = self.statusBar()
+        #self.status_bar = self.statusBar()
 
-        self.status_bar.showMessage(
-            "Analyzer → Browse Input Files"
-        )
+        # self.status_bar.showMessage(
+        #     "Analyzer → Browse Input Files"
+        # )
 
-        # -----------------------------
-        # MENU
-        # -----------------------------
-        self.create_menu()
-
+        self.load_analyzer_ui()
         # -----------------------------
         # DRAG DROP
         # -----------------------------
         self.setAcceptDrops(True)
 
 
-
     def load_analyzer_ui(self):
+        print("LOAD_ANALYZER_UI CALLED")
 
-
-        if self.ui_loaded:
-            self.show_input_tab()
-            return
+        # if self.ui_loaded:
+        self.show_input_tab()
+        #return
 
         # -----------------------------
         # FILE INPUT TAB
@@ -237,81 +235,12 @@ class MainWindow(MangoMainWindow):
         # -----------------------------
         # STATE
         # -----------------------------
-        self.ui_loaded = True
+        #self.ui_loaded = True
 
-
+        print("TAB COUNT:", self.tabs.count())  # <-- HERE
 
         self.show_input_tab()
 
-    def load_csv_merger_ui(self):
-
-        dlg = CSVMergerDialog()
-
-        dlg.exec_()
-
-
-    def create_menu(self):
-
-        menubar = self.menuBar()
-
-        # -------------------------
-        # ANALYZER MENU
-        # -------------------------
-        analyzer_menu = menubar.addMenu("&Alarm Analyzer")
-
-        browse_action = analyzer_menu.addAction(
-            "Browse Input Files"
-        )
-
-        browse_action.setIcon(
-            QIcon(resource_path("resources/icon/browsefiles.png"))
-        )
-
-        browse_action.triggered.connect(
-            self.load_analyzer_ui
-        )
-
-        mergefile_action = analyzer_menu.addAction(
-            "Merge Alarm Files"
-        )
-
-        mergefile_action.setIcon(
-            QIcon(resource_path("resources/icon/merge.png"))
-        )
-
-        mergefile_action.triggered.connect(
-            self.load_csv_merger_ui
-        )
-
-
-        analyzer_menu.addSeparator()
-
-        exit_action = analyzer_menu.addAction(
-            "Exit"
-        )
-
-        exit_action.setIcon(
-            QIcon(resource_path("resources/icon/exitapp.png"))
-        )
-        exit_action.triggered.connect(
-            self.close
-        )
-
-
-        # -------------------------
-        # HELP MENU
-        # -------------------------
-        help_menu = menubar.addMenu("&Help")
-
-        about_action = help_menu.addAction(
-            "About"
-        )
-        about_action.setIcon(
-            QIcon(resource_path("resources/icon/about.png"))
-        )
-        about_action.triggered.connect(
-            self.show_about
-        )
 
     def show_input_tab(self):
 
@@ -321,37 +250,7 @@ class MainWindow(MangoMainWindow):
                 self.tabs.setCurrentIndex(i)
                 return
 
-    def show_about(self):
 
-        QMessageBox.about(
-            self,
-            "About PostCheck Analyzer",
-            """
-            <h3>PostCheck Analyzer</h3>
-
-            <p><b>Version:</b> 1.0</p>
-
-            <p>
-            <b>Developed By:</b><br>
-            Tapon Paul
-            </p>
-
-            <p>
-            <b>Email:</b><br>
-            tapon.paul@nokia.com
-            </p>
-
-            <p>
-            <b>Phone:</b><br>
-            +8801919045275
-            </p>
-
-            <p>
-            RAN Specialist Engineer<br>
-            Nokia
-            </p>
-            """
-        )
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls():
@@ -370,7 +269,9 @@ class MainWindow(MangoMainWindow):
         self.scan_alarm_folder(path)
 
     def scan_alarm_folder(self, folder):
-
+        print("SELF:", id(self))
+        print("PRE_EDIT:", id(self.pre_edit))
+        print("VISIBLE WIDGET:", id(self))
         pre_file = None
         post_file = None
         pre_hist_file = None
@@ -406,6 +307,7 @@ class MainWindow(MangoMainWindow):
         self.post_hist_edit.clear()
         if pre_file:
             self.pre_edit.setText(pre_file.replace("\\", "/"))
+            print("TEXT=", self.pre_edit.text())
 
         if post_file:
             self.post_edit.setText(post_file.replace("\\", "/"))
@@ -493,15 +395,15 @@ class MainWindow(MangoMainWindow):
         # -----------------------------
         # SAFETY CHECKS
         # -----------------------------
-        if not self.ui_loaded:
-            QMessageBox.warning(
-                self,
-                "Warning",
-                "Please select Analyzer → Browse Input Files first."
-            )
-            return
+        # if not self.ui_loaded:
+        # QMessageBox.warning(
+        #     self,
+        #     "Warning",
+        #     "Please select Analyzer → Browse Input Files first."
+        # )
+        #return
 
-        path = self.history_source_edit.text().strip().replace("\\","/")
+        path = self.history_source_edit.text().strip().replace("\\", "/")
 
         if not path:
             QMessageBox.warning(
@@ -594,8 +496,8 @@ class MainWindow(MangoMainWindow):
 
     def get_current_alarm_table(self):
 
-        if not self.ui_loaded:
-            return None
+        # if not self.ui_loaded:
+        #     return None
 
         widget = self.tabs.currentWidget()
 
@@ -622,13 +524,13 @@ class MainWindow(MangoMainWindow):
         return None
 
     def update_counts(self):
-        if not self.ui_loaded:
-            QMessageBox.warning(
-                self,
-                "Warning",
-                "Please select Analyzer → Browse Input Files first."
-            )
-            return
+        # if not self.ui_loaded:
+        #     QMessageBox.warning(
+        #         self,
+        #         "Warning",
+        #         "Please select Analyzer → Browse Input Files first."
+        #     )
+        #     return
         pre_count = len(self.pre_tab.df)
         post_count = len(self.post_tab.df)
         history_count = len(self.history_tab.df)
@@ -663,12 +565,12 @@ class MainWindow(MangoMainWindow):
             f"Post Cleared: {cleared_count} | "
             f"Pre History: {history_count}  |  "
             f"Post History: {post_history_count}  |  "
-            
+
             f"{current_text}"
         )
 
     def create_input_tab(self):
-
+        print("CREATE_INPUT_TAB CALLED")
         page = QWidget()
         layout = QVBoxLayout()
 
@@ -687,8 +589,8 @@ class MainWindow(MangoMainWindow):
 
         pre_group.setLayout(pre_layout)
         pre_group.setToolTip("Browse an input file that contains the active alarms before the activity"
-                              "\nFor automatic file detection in drag and drop, use keyword [pre] anywhere "
-                              "in the filename")
+                             "\nFor automatic file detection in drag and drop, use keyword [pre] anywhere "
+                             "in the filename")
         layout.addWidget(pre_group)
 
         # ---------------- POST ALARM ----------------
@@ -733,7 +635,6 @@ class MainWindow(MangoMainWindow):
                               "in the filename")
         layout.addWidget(hist_group)
 
-
         # ---------------- POST HISTORY ALARM ----------------
         post_hist_group = MangoGroupBox("Post History Alarm File")
         post_hist_group.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
@@ -750,8 +651,8 @@ class MainWindow(MangoMainWindow):
 
         post_hist_group.setLayout(post_hist_layout)
         post_hist_group.setToolTip("Browse an input file that contains the history alarms after the activity"
-                              "\nFor automatic file detection in drag and drop, use keyword [latest] anywhere "
-                              "in the filename")
+                                   "\nFor automatic file detection in drag and drop, use keyword [latest] anywhere "
+                                   "in the filename")
         layout.addWidget(post_hist_group)
 
         # ---------------- RUN BUTTON ----------------
@@ -877,21 +778,20 @@ class MainWindow(MangoMainWindow):
             on=merge_cols,
             how="left"
         )
+
     def run_analysis(self):
-        x=1
-        if not self.ui_loaded:
-            QMessageBox.warning(
-                self,
-                "Warning",
-                "Please select Analyzer → Browse Input Files first."
-            )
-            return
+        x = 1
+        # if not self.ui_loaded:
+        #     QMessageBox.warning(
+        #         self,
+        #         "Warning",
+        #         "Please select Analyzer → Browse Input Files first."
+        #     )
+        #     return
         try:
             # ----------------------------
             # 1. LOAD FILES (SAFE)
             # ----------------------------
-
-
 
             self.pre_df = self.load_csv_if_exists(self.pre_edit.text())
             self.post_df = self.load_csv_if_exists(self.post_edit.text())
@@ -948,8 +848,6 @@ class MainWindow(MangoMainWindow):
                 self.history_df  # IMPORTANT
             )
 
-
-
             # ----------------------------
             # 4. HISTORY DELTA (INDEPENDENT)
             # ----------------------------
@@ -959,7 +857,6 @@ class MainWindow(MangoMainWindow):
             )
 
             new_df = self.apply_status_to_dataframe(new_df)
-
 
             hist_new_df = self.apply_status_to_dataframe(hist_new_df)
 
@@ -993,7 +890,6 @@ class MainWindow(MangoMainWindow):
                 hist_new_df,
                 "#d4ffd4",
 
-
             )
 
             self.hist_cleared_tab.load_dataframe(
@@ -1022,7 +918,6 @@ class MainWindow(MangoMainWindow):
 
         except Exception as e:
             QMessageBox.critical(self, "Error", str(e))
-
 
     def switch_to_first_available_tab(self):
 
@@ -1067,6 +962,137 @@ class MainWindow(MangoMainWindow):
 
         # fallback
         self.tabs.setCurrentIndex(0)
+
+
+class MainWindow(MangoMainWindow):
+
+    def __init__(self):
+        super().__init__()
+
+        self.container = QStackedWidget()
+        self.setCentralWidget(self.container)
+        self.alarm_analyzer = None
+        self.config_analyzer = None
+
+        self.create_menu()
+
+    def show_about(self):
+
+        QMessageBox.about(
+            self,
+            "About PostCheck Analyzer",
+            """
+            <h3>PostCheck Analyzer</h3>
+
+            <p><b>Version:</b> 1.0</p>
+
+            <p>
+            <b>Developed By:</b><br>
+            Tapon Paul
+            </p>
+
+            <p>
+            <b>Email:</b><br>
+            tapon.paul@nokia.com
+            </p>
+
+            <p>
+            <b>Phone:</b><br>
+            +8801919045275
+            </p>
+
+            <p>
+            RAN Specialist Engineer<br>
+            Nokia
+            </p>
+            """
+        )
+
+    def show_alarm_analyzer(self):
+        if self.alarm_analyzer is None:
+            self.alarm_analyzer = AlarmAnalyzerWidget(self.statusBar())
+            self.container.addWidget(self.alarm_analyzer)
+
+            print("CREATED:", id(self.alarm_analyzer))
+            #self.alarm_analyzer.load_analyzer_ui()
+
+            self.container.addWidget(
+                self.alarm_analyzer
+            )
+        print("SHOWING:", id(self.alarm_analyzer))
+        self.container.setCurrentWidget(self.alarm_analyzer)
+
+
+    def create_menu(self):
+
+        menubar = self.menuBar()
+
+        # -------------------------
+        # ANALYZER MENU
+        # -------------------------
+        analyzer_menu = menubar.addMenu("&Alarm Analyzer")
+
+        browse_action = analyzer_menu.addAction(
+            "Browse Input Files"
+        )
+
+        browse_action.setIcon(
+            QIcon(resource_path("resources/icon/browsefiles.png"))
+        )
+
+        browse_action.triggered.connect(
+            self.show_alarm_analyzer
+        )
+
+        mergefile_action = analyzer_menu.addAction(
+            "Merge Alarm Files"
+        )
+
+        mergefile_action.setIcon(
+            QIcon(resource_path("resources/icon/merge.png"))
+        )
+
+        mergefile_action.triggered.connect(
+            self.load_csv_merger_ui
+        )
+
+
+        analyzer_menu.addSeparator()
+
+        exit_action = analyzer_menu.addAction(
+            "Exit"
+        )
+
+        exit_action.setIcon(
+            QIcon(resource_path("resources/icon/exitapp.png"))
+        )
+        exit_action.triggered.connect(
+            self.close
+        )
+
+
+        # -------------------------
+        # HELP MENU
+        # -------------------------
+        help_menu = menubar.addMenu("&Help")
+
+        about_action = help_menu.addAction(
+            "About"
+        )
+        about_action.setIcon(
+            QIcon(resource_path("resources/icon/about.png"))
+        )
+        about_action.triggered.connect(
+            self.show_about
+        )
+
+
+    def load_csv_merger_ui(self):
+
+        dlg = CSVMergerDialog()
+
+        dlg.exec_()
+
 
 if __name__ == "__main__":
 
