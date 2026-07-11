@@ -185,37 +185,125 @@ class GlobalFilterProxy(QSortFilterProxyModel):
     def __init__(self):
         super().__init__()
         self.search_text = ""
+        self.column_filters = {}
 
     def setSearch(self, text):
         self.search_text = text.strip().lower()
         self.invalidateFilter()
 
-    def filterAcceptsRow(self, row, parent):
+    def setColumnFilter(self, column, text):
+        text = text.strip().lower()
 
-        if not self.search_text:
+        if text:
+            self.column_filters[column] = text
+        else:
+            self.column_filters.pop(column, None)
+
+        self.invalidateFilter()
+
+    def filterAcceptsRow(self, source_row, source_parent):
+        model = self.sourceModel()
+
+        if model is None:
             return True
 
-        model = self.sourceModel()
-        if not model:
-            return False
+        # --------------------------------
+        # Existing global search
+        # --------------------------------
+        if self.search_text:
+            global_match = False
 
-        column_count = model.columnCount(parent)
+            for column in range(model.columnCount()):
+                index = model.index(
+                    source_row,
+                    column,
+                    source_parent
+                )
 
-        for col in range(column_count):
+                value = str(
+                    model.data(index, Qt.DisplayRole) or ""
+                ).lower()
 
-            idx = model.index(row, col, parent)
-            value = model.data(idx, Qt.DisplayRole)
+                if self.search_text in value:
+                    global_match = True
+                    break
 
-            if value is None:
-                continue
+            if not global_match:
+                return False
 
-            # convert ONCE
-            value_str = str(value).lower()
+        # --------------------------------
+        # Per-column filters
+        # --------------------------------
 
-            if self.search_text in value_str:
-                return True
+        for column, filter_text in self.column_filters.items():
 
-        return False
+            index = model.index(
+                source_row,
+                column,
+                source_parent
+            )
+
+            value = str(
+                model.data(index, Qt.DisplayRole) or ""
+            ).lower()
+
+            # Split multiple conditions
+            terms = [
+                term.strip()
+                for term in filter_text.split("|")
+                if term.strip()
+            ]
+
+            # Negative terms: !abc, !def
+            negative_terms = [
+                term[1:]
+                for term in terms
+                if term.startswith("!") and len(term) > 1
+            ]
+
+            # Positive terms: abc, def
+            positive_terms = [
+                term
+                for term in terms
+                if not term.startswith("!")
+            ]
+
+            # Exclude if ANY negative term is found
+            if any(term in value for term in negative_terms):
+                return False
+
+            # For positive terms, match ANY of them
+            if positive_terms:
+                if not any(term in value for term in positive_terms):
+                    return False
+
+        return True
+    # def filterAcceptsRow(self, row, parent):
+    #
+    #     if not self.search_text:
+    #         return True
+    #
+    #     model = self.sourceModel()
+    #     if not model:
+    #         return False
+    #
+    #     column_count = model.columnCount(parent)
+    #
+    #     for col in range(column_count):
+    #
+    #         idx = model.index(row, col, parent)
+    #         value = model.data(idx, Qt.DisplayRole)
+    #
+    #         if value is None:
+    #             continue
+    #
+    #         # convert ONCE
+    #         value_str = str(value).lower()
+    #
+    #         if self.search_text in value_str:
+    #             return True
+    #
+    #     return False
     #
     # def sort(self, column, order):
     #     source = self.sourceModel()

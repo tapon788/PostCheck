@@ -12,13 +12,15 @@ from PyQt5.QtWidgets import (
     QTableView,
     QMessageBox,
     QMenu,
-    QHeaderView
+    QHeaderView,
+QLabel
 
 )
 
 from AlarmComparison.customwidgets import (
     MangoButton,
     MangoLineEdit,
+    MangoCheckableComboBox,
 )
 
 from AlarmComparison.helper_functions import resource_path
@@ -29,31 +31,67 @@ from AlarmComparison.dialogs import DetailDialog
 from dialogs import StatusDialog
 class AlarmTable(QWidget):
     filterChanged = pyqtSignal()
-
-    def __init__(self, filename=None):
+    runRequested = pyqtSignal()
+    def __init__(self, filename=None, context=None):
         super().__init__()
+
         self.enable_status_tracking = False
         self.df = pd.DataFrame()
         self.filename = filename
+
         self.search = MangoLineEdit()
         self.search.setPlaceholderText("Search...")
         self.search_timer = QTimer()
         self.search_timer.setSingleShot(True)
-        self.search_timer.setInterval(250)
+        self.search_timer.setInterval(500)
         self.search_timer.timeout.connect(self.apply_search)
 
-        self.export_btn = MangoButton("", resource_path("resources/icon/export.png"))
+        self.export_btn = MangoButton("","Export Data", resource_path("resources/icon/export.png"))
         self.export_btn.clicked.connect(self.export_csv)
 
         self.table = QTableView()
         self.table.setSortingEnabled(True)
 
         layout = QVBoxLayout()
+        if context == "delta":
+            self.checkable_combo_delta = MangoCheckableComboBox()
+            self.checkable_combo_delta.addItems([
+                "Alarm Number",
+                "Supplementary Information",
+                "Distinguished Name",
+                "Diagnostic Info",
+                "Severity",
+            ])
+            self.btn_run_delta = MangoButton("", "Re-calculate Delta", resource_path("resources/icon/play.ico"))
+            self.btn_run_delta.clicked.connect(self.runRequested.emit)
+            top_select_delta = QHBoxLayout()
+            top_select_delta.addWidget(QLabel("Delta Comparison Combination"))
+            top_select_delta.addWidget(self.checkable_combo_delta)
+
+            top_select_delta.addWidget(self.btn_run_delta)
+            top_select_delta.setStretch(0, 0)
+            top_select_delta.setStretch(1, 1)
+            top_select_delta.setStretch(2, 0)
+
+            layout.addLayout(top_select_delta)
+
         top = QHBoxLayout()
+
         top.addWidget(self.search)
         top.addWidget(self.export_btn)
+
         layout.addLayout(top)
+
+        self.column_filter_widget = QWidget()
+        self.column_filter_widget.setFixedHeight(35)
+
+        layout.addWidget(self.column_filter_widget)
         layout.addWidget(self.table)
+
+        self.column_filter_edits = []
+
+
+        #layout.addWidget(self.table)
         self.setLayout(layout)
         self.proxy = GlobalFilterProxy()
         self.proxy.layoutChanged.connect(self.filterChanged.emit)
@@ -90,6 +128,25 @@ class AlarmTable(QWidget):
             border: 1px solid #444;
         }
         """)
+
+        # self.table.horizontalHeader().sectionResized.connect(
+        #     self.on_column_resized
+        # )
+        #self.btn_run_delta.clicked.connect(self.run_delta_analysis)
+
+        header = self.table.horizontalHeader()
+
+        header.sectionResized.connect(
+            self.update_filter_positions
+        )
+
+        header.sectionMoved.connect(
+            self.update_filter_positions
+        )
+
+        self.table.horizontalScrollBar().valueChanged.connect(
+            self.update_filter_positions
+        )
 
     def update_status(self, source_index):
 
@@ -559,6 +616,82 @@ class AlarmTable(QWidget):
         self.resize_cols("Status", 400)
         #self.resize_cols("Resolved", 30)
 
+        self.create_column_filters()
+
+    def create_column_filters(self):
+
+        for edit in self.column_filter_edits:
+            edit.deleteLater()
+
+        self.column_filter_edits.clear()
+
+        model = self.proxy.sourceModel()
+
+        if model is None:
+            return
+
+        for column in range(model.columnCount()):
+            edit = MangoLineEdit(
+                self.column_filter_widget
+            )
+
+            edit.setPlaceholderText("Filter...")
+            edit.setClearButtonEnabled(True)
+
+            edit.textChanged.connect(
+                lambda text, col=column:
+                self.proxy.setColumnFilter(col, text)
+            )
+
+            edit.show()
+
+            self.column_filter_edits.append(edit)
+
+        self.update_filter_positions()
+
+    def update_filter_positions(self, *args):
+
+        header = self.table.horizontalHeader()
+
+        for logical_index, edit in enumerate(
+                self.column_filter_edits
+        ):
+            x = header.sectionViewportPosition(
+                logical_index
+            )
+
+            width = header.sectionSize(
+                logical_index
+            )
+
+            edit.setGeometry(
+                x,
+                0,
+                width,
+                self.column_filter_widget.height()
+            )
+
+    # def sync_filter_widths(self):
+    #
+    #     for column, edit in enumerate(
+    #             self.column_filter_edits
+    #     ):
+    #         edit.setFixedWidth(
+    #             self.table.columnWidth(column)
+    #         )
+    #
+    # def on_column_resized(
+    #         self,
+    #         logical_index,
+    #         old_size,
+    #         new_size
+    # ):
+    #     if logical_index < len(
+    #             self.column_filter_edits
+    #     ):
+    #         self.column_filter_edits[
+    #             logical_index
+    #         ].setFixedWidth(new_size)
 
     def show_details(self, index):
 
@@ -616,3 +749,8 @@ class AlarmTable(QWidget):
                 self.table.setColumnWidth(col, width)
                 header.setSectionResizeMode(col, QHeaderView.Interactive)
                 break
+
+
+    def run_delta_analysis(self,pre_df, post_df, history_df):
+        pass
+

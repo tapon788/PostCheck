@@ -1,27 +1,43 @@
 import os
 from PyQt5.QtWidgets import (
-    QMainWindow, QPushButton, QLineEdit, QCheckBox, QLabel,
-    QComboBox, QGroupBox, QMenu, QAction, QMenuBar, QApplication,
-    QTableWidget
+    QMainWindow, QPushButton, QLineEdit, QCheckBox, QGroupBox, QLabel,
+    QComboBox, QStyledItemDelegate, QDateTimeEdit
+
 )
 from PyQt5.QtGui import (
-    QIcon, QPixmap, QFont
+    QIcon, QPixmap, QStandardItem, QStandardItemModel
 )
 from PyQt5.QtCore import (
-    Qt, QSize
+    Qt, QSize, QEvent
 )
+
+
+class MangoBanner(QLabel):
+    def __init__(self, text, parent=None):
+        super().__init__(text, parent)
+        self.setCursor(Qt.PointingHandCursor)
+        font = self.font()
+        font.setPointSize(16)
+        font.setBold(True)
+        self.setFont(font)
+        self.setStyleSheet("""
+            QLabel {
+                color: #4a90e2;
+                padding: 10px;
+            }
+        """)
 
 
 class MangoButton(QPushButton):
-    def __init__(self, text, iconpath , parent=None, icon_path=None):
-        super().__init__(text, parent)
+    def __init__(self, btn_text:"", btn_tooltip:"",icon_path:None, parent=None):
+        super().__init__(btn_text, parent)
         self.setCursor(Qt.PointingHandCursor)
-
-        icon_path = os.path.join(os.getcwd(), iconpath)
+        self.setToolTip(btn_tooltip)
+        icon_path = os.path.join(os.getcwd(), icon_path)
         icon_path = icon_path.replace("\\", "/")
         # Set icon
         self.setIcon(QIcon(QPixmap(icon_path)))
-        self.setIconSize(QSize(20,20))  # adjust size as needed
+        self.setIconSize(QSize(25, 25))  # adjust size as needed
         # Mango skin gradient: light green → yellow → orange
         self.setStyleSheet("""
             QPushButton {
@@ -73,6 +89,7 @@ class MangoLineEdit(QLineEdit):
             }
         """)
 
+
 class MangoGroupBox(QGroupBox):
     def __init__(self, title="", *args, **kwargs):
         super().__init__(title, *args, **kwargs)
@@ -82,10 +99,10 @@ class MangoGroupBox(QGroupBox):
 
 
 class MangoMainWindow(QMainWindow):
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args,**kwargs)
-        self.setWindowTitle("Mango Bites")
-        #self.resize(1400, 800)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setWindowTitle("PostCheck Analyzer")
+        # self.resize(1400, 800)
 
 
 class MangoCheckBox(QCheckBox):
@@ -103,3 +120,162 @@ class MangoCheckBox(QCheckBox):
             }
         """)
 
+
+class MangoDateTimeEdit(QDateTimeEdit):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("""
+        QDateTimeEdit {
+        background-color: #fff8dc;
+        color: black;
+        font-size: 16px;
+        
+        border: 1px solid #808080;
+        border-radius: 4px;
+        padding: 4px;
+        }
+
+        QDateTimeEdit::up-button,
+        QDateTimeEdit::down-button {
+            width: 18px;
+        }
+
+        QDateTimeEdit::drop-down {
+            width: 20px;
+        }
+        """)
+
+
+class MangoCheckableComboBox(QComboBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setModel(QStandardItemModel(self))
+        self.setEditable(True)
+        self.lineEdit().setReadOnly(True)
+        self.lineEdit().setPlaceholderText("Select delta comparison fields...")
+
+        # Don't allow typing
+        self.lineEdit().setFocusPolicy(Qt.NoFocus)
+
+        # Better item height
+        self.setItemDelegate(QStyledItemDelegate(self))
+
+        # Catch mouse events in popup
+        self.view().viewport().installEventFilter(self)
+
+        # Prevent current item text from replacing our display text
+        self.currentIndexChanged.connect(lambda: self.setCurrentIndex(-1))
+
+        self.setStyleSheet("""
+            QComboBox {
+                min-height: 35px;
+                border: 2px solid #ccc;
+                border-radius: 4px;
+                background-color: #fff8e1;
+            }
+
+            QComboBox QAbstractItemView {
+                background-color: #2b2b2b;
+                color: white;
+                border: 1px solid #555;
+                outline: none;
+                padding: 5px;
+                selection-background-color: #444;
+                selection-color: white;
+            }
+
+            QComboBox QAbstractItemView::item {
+                min-height: 30px;
+                padding: 4px 8px;
+            }
+
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #444;
+            }
+
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #555;
+                color: white;
+            }
+        """)
+
+    def addItem(self, text):
+        item = QStandardItem(text)
+        item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
+        item.setData(Qt.Unchecked, Qt.CheckStateRole)
+        self.model().appendRow(item)
+
+    def addItems(self, texts):
+        for text in texts:
+            self.addItem(text)
+
+    def eventFilter(self, obj, event):
+        if obj == self.view().viewport() and event.type() == QEvent.MouseButtonRelease:
+
+            index = self.view().indexAt(event.pos())
+
+            if index.isValid():
+                item = self.model().itemFromIndex(index)
+
+                if item.checkState() == Qt.Checked:
+                    item.setCheckState(Qt.Unchecked)
+                else:
+                    item.setCheckState(Qt.Checked)
+
+                self.updateText()
+
+                # Keep popup open
+                return True
+
+        return super().eventFilter(obj, event)
+
+    # def hidePopup(self):
+    #     """
+    #     Don't close the popup after every click.
+    #     Close only when the user clicks outside or presses Esc.
+    #     """
+    #     if self.view().underMouse():
+    #         return
+    #     super().hidePopup()
+
+    def checkedItems(self):
+        result = []
+
+        for row in range(self.model().rowCount()):
+            item = self.model().item(row)
+            if item.checkState() == Qt.Checked:
+                result.append(item.text())
+
+        return result
+
+    def updateText(self):
+        self.lineEdit().setText(" + ".join(self.checkedItems()))
+
+    def setCheckedItems(self, items):
+        """
+        Check the items whose text appears in the given list.
+
+        Parameters
+        ----------
+        items : list[str]
+            List of item texts to check.
+        """
+        items = set(items)  # Faster lookup
+
+        for row in range(self.model().rowCount()):
+            item = self.model().item(row)
+
+            if item.text() in items:
+                item.setCheckState(Qt.Checked)
+            else:
+                item.setCheckState(Qt.Unchecked)
+
+        self.updateText()
+
+    # def hidePopup(self):
+    #     if self.view().underMouse():
+    #         return
+    #
+    #     super().hidePopup()
+    #     self.updateText()

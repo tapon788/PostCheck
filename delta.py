@@ -141,7 +141,7 @@ import pandas as pd
 
 import pandas as pd
 
-def calculate_pre_post_delta(pre_df, post_df, history_df=None):
+def calculate_pre_post_delta(pre_df, post_df, history_df=None, key_cols = []):
 
     if pre_df is None:
         pre_df = pd.DataFrame()
@@ -153,13 +153,6 @@ def calculate_pre_post_delta(pre_df, post_df, history_df=None):
     if pre_df.empty or post_df.empty:
         return pd.DataFrame(), pd.DataFrame()
 
-    key_cols = [
-        "Alarm Number",
-        "Supplementary Information",
-        "Distinguished Name",
-        "Diagnostic Info",
-        "Severity",
-    ]
 
     def make_key(df):
         return (
@@ -232,7 +225,9 @@ def calculate_pre_post_delta(pre_df, post_df, history_df=None):
 
     return new_df, cleared_df
 
-def calculate_history_delta(history_df: pd.DataFrame, post_history_df: pd.DataFrame):
+
+def calculate_history_delta(history_df: pd.DataFrame, post_history_df: pd.DataFrame, key_cols: []):
+
     """
     Returns:
         hist_new_df, hist_cleared_df
@@ -249,13 +244,13 @@ def calculate_history_delta(history_df: pd.DataFrame, post_history_df: pd.DataFr
     if history_df.empty or post_history_df.empty:
         return hist_new_df, hist_cleared_df
 
-    key_cols = [
-        "Alarm Number",
-        "Supplementary Information",
-        "Distinguished Name",
-        "Diagnostic Info",
-        "Severity",
-    ]
+    # key_cols = [
+    #     "Alarm Number",
+    #     "Supplementary Information",
+    #     "Distinguished Name",
+    #     "Diagnostic Info",
+    #     "Severity",
+    # ]
 
     def make_key(df):
         return (
