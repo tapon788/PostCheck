@@ -29,6 +29,7 @@ from AlarmComparison.models import PandasModel,GlobalFilterProxy
 from AlarmComparison.dialogs import DetailDialog
 
 from dialogs import StatusDialog
+
 class AlarmTable(QWidget):
     filterChanged = pyqtSignal()
     runRequested = pyqtSignal()
@@ -94,8 +95,8 @@ class AlarmTable(QWidget):
         #layout.addWidget(self.table)
         self.setLayout(layout)
         self.proxy = GlobalFilterProxy()
-        self.proxy.layoutChanged.connect(self.filterChanged.emit)
-        self.proxy.modelReset.connect(self.filterChanged.emit)
+        # self.proxy.layoutChanged.connect(self.filterChanged.emit)
+        # self.proxy.modelReset.connect(self.filterChanged.emit)
         self.search.textChanged.connect(self.restart_search_timer)
         self.table.doubleClicked.connect(
             self.show_details
@@ -640,7 +641,7 @@ class AlarmTable(QWidget):
 
             edit.textChanged.connect(
                 lambda text, col=column:
-                self.proxy.setColumnFilter(col, text)
+                self.on_column_filter_changed(col, text)
             )
 
             edit.show()
@@ -649,6 +650,9 @@ class AlarmTable(QWidget):
 
         self.update_filter_positions()
 
+    def on_column_filter_changed(self, column, text):
+        self.proxy.setColumnFilter(column, text)
+        self.filterChanged.emit()
     def update_filter_positions(self, *args):
 
         header = self.table.horizontalHeader()
@@ -753,4 +757,3 @@ class AlarmTable(QWidget):
 
     def run_delta_analysis(self,pre_df, post_df, history_df):
         pass
-

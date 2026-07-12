@@ -210,8 +210,31 @@ class GlobalFilterProxy(QSortFilterProxyModel):
         # --------------------------------
         # Existing global search
         # --------------------------------
+        # if self.search_text:
+        #     global_match = False
+        #
+        #     for column in range(model.columnCount()):
+        #         index = model.index(
+        #             source_row,
+        #             column,
+        #             source_parent
+        #         )
+        #
+        #         value = str(
+        #             model.data(index, Qt.DisplayRole) or ""
+        #         ).lower()
+        #
+        #         if self.search_text in value:
+        #             global_match = True
+        #             break
+        #
+        #     if not global_match:
+        #         return False
+
         if self.search_text:
-            global_match = False
+
+            # Combine all column values for this row
+            row_values = []
 
             for column in range(model.columnCount()):
                 index = model.index(
@@ -224,17 +247,50 @@ class GlobalFilterProxy(QSortFilterProxyModel):
                     model.data(index, Qt.DisplayRole) or ""
                 ).lower()
 
-                if self.search_text in value:
-                    global_match = True
-                    break
+                row_values.append(value)
 
-            if not global_match:
+            # Treat the whole row as searchable text
+            row_text = " ".join(row_values)
+
+            # Split: abc | def | !xyz
+            terms = [
+                term.strip()
+                for term in self.search_text.split("|")
+                if term.strip()
+            ]
+
+            positive_terms = [
+                term
+                for term in terms
+                if not term.startswith("!")
+            ]
+
+            negative_terms = [
+                term[1:].strip()
+                for term in terms
+                if term.startswith("!") and len(term) > 1
+            ]
+
+            # Reject if ANY excluded term exists anywhere in the row
+            if any(
+                    term in row_text
+                    for term in negative_terms
+            ):
                 return False
+
+            # If positive terms exist, at least ONE must exist
+            if positive_terms and not any(
+                    term in row_text
+                    for term in positive_terms
+            ):
+                return False
+
 
         # --------------------------------
         # Per-column filters
         # --------------------------------
 
+    # Per-column filters
         for column, filter_text in self.column_filters.items():
 
             index = model.index(
@@ -247,35 +303,34 @@ class GlobalFilterProxy(QSortFilterProxyModel):
                 model.data(index, Qt.DisplayRole) or ""
             ).lower()
 
-            # Split multiple conditions
+            # Split by | and remove surrounding spaces
             terms = [
                 term.strip()
                 for term in filter_text.split("|")
                 if term.strip()
             ]
 
-            # Negative terms: !abc, !def
-            negative_terms = [
-                term[1:]
-                for term in terms
-                if term.startswith("!") and len(term) > 1
-            ]
-
-            # Positive terms: abc, def
             positive_terms = [
                 term
                 for term in terms
                 if not term.startswith("!")
             ]
 
-            # Exclude if ANY negative term is found
+            negative_terms = [
+                term[1:].strip()
+                for term in terms
+                if term.startswith("!") and len(term) > 1
+            ]
+
+            # Exclude if ANY negative term matches
             if any(term in value for term in negative_terms):
                 return False
 
-            # For positive terms, match ANY of them
-            if positive_terms:
-                if not any(term in value for term in positive_terms):
-                    return False
+            # If positive terms exist, at least ONE must match
+            if positive_terms and not any(
+                    term in value for term in positive_terms
+            ):
+                return False
 
         return True
     # def filterAcceptsRow(self, row, parent):

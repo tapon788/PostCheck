@@ -436,10 +436,15 @@ class AlarmAnalyzerWidget(QWidget):
         if not urls:
             return
         path = urls[0].toLocalFile()
-        if not os.path.isdir(path):
-            return
+        if os.path.isdir(path):
+            # Folder dropped
+            self.scan_alarm_folder(path)
 
-        self.scan_alarm_folder(path)
+        elif os.path.isfile(path):
+            # File dropped
+            self.scan_alarm_file(path)
+
+        event.acceptProposedAction()
 
     def scan_alarm_folder(self, folder):
         print("SELF:", id(self))
@@ -490,6 +495,21 @@ class AlarmAnalyzerWidget(QWidget):
 
         if post_hist_file:
             self.post_hist_edit.setText(post_hist_file.replace("\\", "/"))
+
+    def scan_alarm_file(self, file_path):
+        filename = os.path.basename(file_path).lower()
+
+        if "latest" in filename:
+            self.latest_hist_edit.setText(file_path)
+
+        elif "pre" in filename:
+            self.pre_edit.setText(file_path)
+
+        elif "post" in filename:
+            self.post_edit.setText(file_path)
+
+        elif "his" in filename:
+            self.hist_edit.setText(file_path)
 
     def create_history_analysis_tab(self):
 
@@ -782,7 +802,7 @@ class AlarmAnalyzerWidget(QWidget):
         self.pre_edit = MangoLineEdit()
         self.pre_edit.setPlaceholderText("Browse pre active alarms ...")
 
-        pre_btn = QPushButton("Browse")
+        pre_btn = MangoButton("Browse..", "Browse a file for pre alarms", resource_path("resources/icon/browse.ico"))
         pre_btn.clicked.connect(lambda: self.browse(self.pre_edit))
 
         pre_layout.addWidget(self.pre_edit)
@@ -802,7 +822,7 @@ class AlarmAnalyzerWidget(QWidget):
         self.post_edit = MangoLineEdit()
         self.post_edit.setPlaceholderText("Browse post active alarms ...")
 
-        post_btn = QPushButton("Browse")
+        post_btn = MangoButton("Browse..", "Browse a file for post alarms", resource_path("resources/icon/browse.ico"))
         post_btn.clicked.connect(lambda: self.browse(self.post_edit))
 
         post_layout.addWidget(self.post_edit)
@@ -824,7 +844,7 @@ class AlarmAnalyzerWidget(QWidget):
         self.hist_edit = MangoLineEdit()
         self.hist_edit.setPlaceholderText("Browse pre history alarms ...")
 
-        hist_btn = QPushButton("Browse")
+        hist_btn = MangoButton("Browse..", "Browse a file for pre history alarms", resource_path("resources/icon/browse.ico"))
         hist_btn.clicked.connect(lambda: self.browse(self.hist_edit))
 
         hist_layout.addWidget(self.hist_edit)
@@ -844,7 +864,7 @@ class AlarmAnalyzerWidget(QWidget):
         self.post_hist_edit = MangoLineEdit()
         self.post_hist_edit.setPlaceholderText("Browse post history alarms ...")
 
-        post_hist_btn = QPushButton("Browse")
+        post_hist_btn = MangoButton("Browse..", "Browse a file for post history alarms", resource_path("resources/icon/browse.ico"))
         post_hist_btn.clicked.connect(lambda: self.browse(self.post_hist_edit))
 
         post_hist_layout.addWidget(self.post_hist_edit)
@@ -858,8 +878,7 @@ class AlarmAnalyzerWidget(QWidget):
 
         # ---------------- RUN BUTTON ----------------
         run_btn = MangoButton("Run","CLick to Run", resource_path("resources/icon/run.png"))
-        # run_btn.setFixedHeight(40)
-        # run_btn.setMaximumWidth(100)
+
         run_btn.clicked.connect(self.run_analysis)
 
         layout.addWidget(run_btn, alignment=Qt.AlignHCenter)
@@ -873,7 +892,7 @@ class AlarmAnalyzerWidget(QWidget):
 
         layout = QHBoxLayout()
 
-        btn = QPushButton("Browse")
+        btn = QPushButton("Browser")
 
         btn.clicked.connect(
             lambda: self.browse(lineedit)
