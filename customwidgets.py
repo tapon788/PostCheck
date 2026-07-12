@@ -65,7 +65,7 @@ class MangoButton(QPushButton):
 class MangoLineEdit(QLineEdit):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setPlaceholderText("Enter text here...")
+        self.setPlaceholderText("")
         # Default style
         self.setStyleSheet("""
             QLineEdit {
@@ -229,15 +229,6 @@ class MangoCheckableComboBox(QComboBox):
                 return True
 
         return super().eventFilter(obj, event)
-
-    # def hidePopup(self):
-    #     """
-    #     Don't close the popup after every click.
-    #     Close only when the user clicks outside or presses Esc.
-    #     """
-    #     if self.view().underMouse():
-    #         return
-    #     super().hidePopup()
 
     def checkedItems(self):
         result = []

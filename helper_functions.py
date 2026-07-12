@@ -8,26 +8,26 @@ def resource_path(relative_path):
 
 DISPLAY_COLUMNS = [
     "Severity",
+    "Alarm Time",
     "Alarm Number",
+    "Alarm Text",
     "Supplementary Information",
     "Distinguished Name",
-    "Alarm Time",
-    "Alarm Text",
     "Diagnostic Info",
     "Name",
 ]
 
 DISPLAY_COLUMNS_NEW = [
     "Severity",
+    "Alarm Time",
+    "Cancel Time",
     "Alarm Number",
+    "Alarm Text",
     "Supplementary Information",
     "Distinguished Name",
-    "Alarm Time",
     "History Match",
     "Status",
     "Resolved",
-    "Cancel Time",
-    "Alarm Text",
     "Diagnostic Info",
     "Name",
     "History Count",

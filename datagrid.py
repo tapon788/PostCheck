@@ -2,7 +2,6 @@ import os
 import pandas as pd
 
 from PyQt5.QtCore import pyqtSignal
-from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import (
     QWidget,
@@ -13,10 +12,10 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QMenu,
     QHeaderView,
-QLabel
+    QLabel
 
 )
-
+from PyQt5.QtGui import QIcon, QMovie
 from AlarmComparison.customwidgets import (
     MangoButton,
     MangoLineEdit,
@@ -30,18 +29,20 @@ from AlarmComparison.dialogs import DetailDialog
 
 from dialogs import StatusDialog
 
+
 class AlarmTable(QWidget):
     filterChanged = pyqtSignal()
     runRequested = pyqtSignal()
+
     def __init__(self, filename=None, context=None):
         super().__init__()
-
+        self.run_movie = None
         self.enable_status_tracking = False
         self.df = pd.DataFrame()
         self.filename = filename
 
         self.search = MangoLineEdit()
-        self.search.setPlaceholderText("Search...")
+        self.search.setPlaceholderText("Global Filter ...")
         self.search_timer = QTimer()
         self.search_timer.setSingleShot(True)
         self.search_timer.setInterval(500)
@@ -64,7 +65,7 @@ class AlarmTable(QWidget):
                 "Severity",
             ])
             self.btn_run_delta = MangoButton("", "Re-calculate Delta", resource_path("resources/icon/play.ico"))
-            self.btn_run_delta.clicked.connect(self.runRequested.emit)
+            self.btn_run_delta.clicked.connect(lambda: self.runRequested.emit())
             top_select_delta = QHBoxLayout()
             top_select_delta.addWidget(QLabel("Delta Comparison Combination"))
             top_select_delta.addWidget(self.checkable_combo_delta)
@@ -91,12 +92,8 @@ class AlarmTable(QWidget):
 
         self.column_filter_edits = []
 
-
-        #layout.addWidget(self.table)
         self.setLayout(layout)
         self.proxy = GlobalFilterProxy()
-        # self.proxy.layoutChanged.connect(self.filterChanged.emit)
-        # self.proxy.modelReset.connect(self.filterChanged.emit)
         self.search.textChanged.connect(self.restart_search_timer)
         self.table.doubleClicked.connect(
             self.show_details
@@ -115,7 +112,7 @@ class AlarmTable(QWidget):
         self.table.setAlternatingRowColors(True)
         self.table.setStyleSheet("""
         QTableView {
-            font-size: 14px;
+            font-size: 16px;
         }
         """)
 
@@ -129,11 +126,6 @@ class AlarmTable(QWidget):
             border: 1px solid #444;
         }
         """)
-
-        # self.table.horizontalHeader().sectionResized.connect(
-        #     self.on_column_resized
-        # )
-        #self.btn_run_delta.clicked.connect(self.run_delta_analysis)
 
         header = self.table.horizontalHeader()
 
@@ -611,9 +603,12 @@ class AlarmTable(QWidget):
         self.table.setModel(self.proxy)
 
         self.table.resizeColumnsToContents()
-        self.resize_cols("Severity", 30)
-        self.resize_cols("Alarm Number", 85)
+        self.resize_cols("Severity", 100)
+        self.resize_cols("Alarm Number", 100)
         self.resize_cols("Supplementary Information", 250)
+        self.resize_cols("Distinguished Name", 300)
+        self.resize_cols("Diagnostic Info", 350)
+        self.resize_cols("Name", 300)
         self.resize_cols("Status", 400)
         #self.resize_cols("Resolved", 30)
 
@@ -636,7 +631,12 @@ class AlarmTable(QWidget):
                 self.column_filter_widget
             )
 
-            edit.setPlaceholderText("Filter...")
+            #edit.setPlaceholderText("Filter...")
+
+            # filter_action = edit.addAction(
+            #     QIcon(resource_path("resources/icon/browse.ico")),
+            #     MangoLineEdit.LeadingPosition
+            # )
             edit.setClearButtonEnabled(True)
 
             edit.textChanged.connect(
@@ -675,27 +675,7 @@ class AlarmTable(QWidget):
                 self.column_filter_widget.height()
             )
 
-    # def sync_filter_widths(self):
-    #
-    #     for column, edit in enumerate(
-    #             self.column_filter_edits
-    #     ):
-    #         edit.setFixedWidth(
-    #             self.table.columnWidth(column)
-    #         )
-    #
-    # def on_column_resized(
-    #         self,
-    #         logical_index,
-    #         old_size,
-    #         new_size
-    # ):
-    #     if logical_index < len(
-    #             self.column_filter_edits
-    #     ):
-    #         self.column_filter_edits[
-    #             logical_index
-    #         ].setFixedWidth(new_size)
+
 
     def show_details(self, index):
 
@@ -757,3 +737,104 @@ class AlarmTable(QWidget):
 
     def run_delta_analysis(self,pre_df, post_df, history_df):
         pass
+
+
+    def start_run_animation(self):
+        if not hasattr(self, "btn_run_delta"):
+            return
+
+        self.run_movie = QMovie(
+            resource_path("resources/icon/loading.gif")
+        )
+
+        if not self.run_movie.isValid():
+            print("Invalid loading GIF")
+            return
+
+        self.run_movie.frameChanged.connect(
+            self.update_run_button_icon
+        )
+
+        self.run_movie.start()
+
+
+    def update_run_button_icon(self, frame_number):
+        if self.run_movie is None:
+            return
+
+        pixmap = self.run_movie.currentPixmap()
+
+        if not pixmap.isNull():
+            self.btn_run_delta.setIcon(
+                QIcon(pixmap)
+            )
+
+
+    def stop_run_animation(self):
+        if not hasattr(self, "btn_run_delta"):
+            return
+
+        if self.run_movie is not None:
+            self.run_movie.stop()
+            self.run_movie = None
+
+        self.btn_run_delta.setIcon(
+            QIcon(
+                resource_path(
+                    "resources/icon/play.ico"
+                )
+            )
+        )
+
+    def create_column_filters(self):
+
+        for edit in self.column_filter_edits:
+            edit.deleteLater()
+
+        self.column_filter_edits.clear()
+
+        model = self.proxy.sourceModel()
+
+        if model is None:
+            return
+
+        for column in range(model.columnCount()):
+
+            edit = MangoLineEdit(
+                self.column_filter_widget
+            )
+
+            edit.setClearButtonEnabled(True)
+
+            # Placeholder-style filter icon
+            filter_action = edit.addAction(
+                QIcon(
+                    resource_path(
+                        "resources/icon/filter.png"
+                    )
+                ),
+                MangoLineEdit.LeadingPosition
+            )
+
+            # Keep reference to the action
+            edit.filter_action = filter_action
+
+            edit.textChanged.connect(
+                lambda text, col=column:
+                    self.on_column_filter_changed(
+                        col,
+                        text
+                    )
+            )
+
+            # Show icon only when text is empty
+            edit.textChanged.connect(
+                lambda text, action=filter_action:
+                    action.setVisible(not bool(text))
+            )
+
+            edit.show()
+
+            self.column_filter_edits.append(edit)
+
+        self.update_filter_positions()

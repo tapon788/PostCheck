@@ -49,7 +49,7 @@ class StatusDialog(QDialog):
         )
 
         save_btn = MangoButton(
-            "", resource_path("resources/icon/save.ico")
+            "","Save", resource_path("resources/icon/save.ico")
         )
 
         save_btn.clicked.connect(

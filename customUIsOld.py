@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from PyQt5.QtCore import QDateTime
+from PyQt5.QtCore import Qt, QDateTime
 from PyQt5.QtWidgets import (
     QWidget,
     QFileDialog,
@@ -17,12 +17,13 @@ from PyQt5.QtWidgets import (
 from AlarmComparison.delta import calculate_pre_post_delta, calculate_history_delta
 from AlarmComparison.customwidgets import (
     MangoButton,
+    MangoBanner,
     MangoDateTimeEdit
 
 )
-from PyQt5.QtGui import QIcon, QMovie
+from PyQt5.QtGui import QIcon
 from PyQt5.QtCore import Qt, QObject, QThread, pyqtSignal
-from AlarmComparison.customwidgets import MangoLineEdit, MangoGroupBox
+from AlarmComparison.customwidgets import MangoLineEdit, MangoGroupBox, MangoCheckableComboBox
 from AlarmComparison.helper_functions import resource_path, DISPLAY_COLUMNS, DISPLAY_COLUMNS_NEW
 from datagrid import AlarmTable
 
@@ -235,165 +236,6 @@ class CSVMergerDialog(QDialog):
                 str(e)
             )
 
-class AnalysisWorker(QObject):
-    finished = pyqtSignal(object)
-    error = pyqtSignal(str)
-
-    def __init__(
-        self,
-        pre_path,
-        post_path,
-        history_path,
-        post_history_path,
-        key_cols_active_delta,
-        key_cols_history_delta,
-        status_file
-    ):
-        super().__init__()
-
-        self.pre_path = pre_path
-        self.post_path = post_path
-        self.history_path = history_path
-        self.post_history_path = post_history_path
-
-        self.key_cols_active_delta = key_cols_active_delta
-        self.key_cols_history_delta = key_cols_history_delta
-
-        self.status_file = status_file
-
-    @staticmethod
-    def load_csv_if_exists(path):
-        path = path.strip()
-
-        if not path:
-            return pd.DataFrame()
-
-        return pd.read_csv(
-            path,
-            dtype=str,
-            keep_default_na=False,
-            low_memory=False
-        )
-
-    def apply_status_to_dataframe(self, df):
-        if df.empty:
-            return df
-
-        if not os.path.exists(self.status_file):
-            df = df.copy()
-            df["Status"] = ""
-            df["Resolved"] = ""
-            return df
-
-        status_db = pd.read_csv(
-            self.status_file,
-            dtype=str,
-            keep_default_na=False
-        )
-
-        if status_db.empty:
-            df = df.copy()
-            df["Status"] = ""
-            df["Resolved"] = ""
-            return df
-
-        merge_cols = [
-            "Supplementary Information",
-            "Distinguished Name",
-            "Diagnostic Info"
-        ]
-
-        status_cols = merge_cols + [
-            "Status",
-            "Resolved"
-        ]
-
-        # Keep only columns that exist
-        if not all(col in status_db.columns for col in status_cols):
-            return df
-
-        status_db = status_db[status_cols]
-
-        return df.merge(
-            status_db,
-            on=merge_cols,
-            how="left"
-        )
-
-    def run(self):
-        try:
-            # -----------------------------
-            # 1. LOAD CSV FILES
-            # -----------------------------
-            pre_df = self.load_csv_if_exists(
-                self.pre_path
-            )
-
-            post_df = self.load_csv_if_exists(
-                self.post_path
-            )
-
-            history_df = self.load_csv_if_exists(
-                self.history_path
-            )
-
-            post_history_df = self.load_csv_if_exists(
-                self.post_history_path
-            )
-
-            # -----------------------------
-            # 2. ACTIVE DELTA
-            # -----------------------------
-            new_df, cleared_df = calculate_pre_post_delta(
-                pre_df,
-                post_df,
-                history_df,
-                self.key_cols_active_delta
-            )
-
-            # -----------------------------
-            # 3. HISTORY DELTA
-            # -----------------------------
-            hist_new_df, hist_cleared_df = (
-                calculate_history_delta(
-                    history_df,
-                    post_history_df,
-                    self.key_cols_history_delta
-                )
-            )
-
-            # -----------------------------
-            # 4. APPLY SAVED STATUS
-            # -----------------------------
-            new_df = self.apply_status_to_dataframe(
-                new_df
-            )
-
-            hist_new_df = self.apply_status_to_dataframe(
-                hist_new_df
-            )
-
-            # -----------------------------
-            # 5. RETURN EVERYTHING
-            # -----------------------------
-            result = {
-                "pre_df": pre_df,
-                "post_df": post_df,
-                "history_df": history_df,
-                "post_history_df": post_history_df,
-
-                "new_df": new_df,
-                "cleared_df": cleared_df,
-
-                "hist_new_df": hist_new_df,
-                "hist_cleared_df": hist_cleared_df,
-            }
-
-            self.finished.emit(result)
-
-        except Exception as e:
-            self.error.emit(str(e))
-
 
 class AlarmAnalyzerWidget(QWidget):
     def __init__(self, status_bar):
@@ -453,9 +295,7 @@ class AlarmAnalyzerWidget(QWidget):
             border: 1px solid #444;
         }
         """)
-        self.analysis_thread = None
-        self.analysis_worker = None
-        self.run_movie = None
+
         self.load_analyzer_ui()
         # -----------------------------
         # DRAG DROP
@@ -493,6 +333,11 @@ class AlarmAnalyzerWidget(QWidget):
         self.delta_tabs = QTabWidget()
         self.delta_tabs.addTab(self.new_tab, "New")
         self.delta_tabs.addTab(self.cleared_tab, "Cleared")
+
+        #self.new_tab.btn_run_delta.clicked.connect(lambda: self.new_tab.run_delta_analysis(self.pre_df, self.post_df, self.history_df))
+
+        #self.new_tab.btn_run_delta.clicked.connect(self.run_analysis)
+
 
         self.new_tab.runRequested.connect(self.run_analysis)
         self.cleared_tab.runRequested.connect(self.run_analysis)
@@ -677,9 +522,9 @@ class AlarmAnalyzerWidget(QWidget):
         file_layout = QHBoxLayout()
 
         self.history_source_edit = MangoLineEdit()
-        self.history_source_edit.setPlaceholderText("Select an alarm file")
+        self.history_source_edit.setPlaceholderText("Select History Source File")
 
-        browse_btn = MangoButton("Browse","Browse an alarm file", resource_path("resources/icon/search.png"))
+        browse_btn = QPushButton("Browse")
 
         browse_btn.clicked.connect(
             self.browse_history_source_file
@@ -705,7 +550,7 @@ class AlarmAnalyzerWidget(QWidget):
         self.alarm_time_from_edit.setDateTime(QDateTime.currentDateTime())
         self.alarm_time_to_edit.setDateTime(QDateTime.currentDateTime())
 
-        run_btn = MangoButton("Filter","Filter Data",resource_path("resources/icon/filter.png"))
+        run_btn = MangoButton("","Filter Data",resource_path("resources/icon/filter.ico"))
         run_btn.clicked.connect(self.run_history_analysis)
 
         filter_layout.addWidget(QLabel("Alarm Time From"))
@@ -743,6 +588,18 @@ class AlarmAnalyzerWidget(QWidget):
             self.history_source_edit.setText(file_name)
 
     def run_history_analysis(self):
+
+
+        # -----------------------------
+        # SAFETY CHECKS
+        # -----------------------------
+        # if not self.ui_loaded:
+        # QMessageBox.warning(
+        #     self,
+        #     "Warning",
+        #     "Please select Analyzer → Browse Input Files first."
+        # )
+        #return
 
         path = self.history_source_edit.text().strip().replace("\\", "/")
 
@@ -865,7 +722,13 @@ class AlarmAnalyzerWidget(QWidget):
         return None
 
     def update_counts(self):
-
+        # if not self.ui_loaded:
+        #     QMessageBox.warning(
+        #         self,
+        #         "Warning",
+        #         "Please select Analyzer → Browse Input Files first."
+        #     )
+        #     return
         pre_count = len(self.pre_tab.df)
         post_count = len(self.post_tab.df)
         history_count = len(self.history_tab.df)
@@ -925,11 +788,6 @@ class AlarmAnalyzerWidget(QWidget):
 
         # ---------------- TITLE ----------------
         label = QLabel("Alarm Analyzer Inputs")
-        label.setStyleSheet("""
-        font-size:24px;
-        font-weight:bold;
-        color:#447100;
-        """)
         label.setAlignment(Qt.AlignCenter)
 
         layout.addWidget(label)
@@ -944,7 +802,7 @@ class AlarmAnalyzerWidget(QWidget):
         self.pre_edit = MangoLineEdit()
         self.pre_edit.setPlaceholderText("Browse pre active alarms ...")
 
-        pre_btn = MangoButton("Browse..", "Browse a file for pre alarms", resource_path("resources/icon/search.png"))
+        pre_btn = MangoButton("Browse..", "Browse a file for pre alarms", resource_path("resources/icon/browse.ico"))
         pre_btn.clicked.connect(lambda: self.browse(self.pre_edit))
 
         pre_layout.addWidget(self.pre_edit)
@@ -964,7 +822,7 @@ class AlarmAnalyzerWidget(QWidget):
         self.post_edit = MangoLineEdit()
         self.post_edit.setPlaceholderText("Browse post active alarms ...")
 
-        post_btn = MangoButton("Browse..", "Browse a file for post alarms", resource_path("resources/icon/search.png"))
+        post_btn = MangoButton("Browse..", "Browse a file for post alarms", resource_path("resources/icon/browse.ico"))
         post_btn.clicked.connect(lambda: self.browse(self.post_edit))
 
         post_layout.addWidget(self.post_edit)
@@ -986,7 +844,7 @@ class AlarmAnalyzerWidget(QWidget):
         self.hist_edit = MangoLineEdit()
         self.hist_edit.setPlaceholderText("Browse pre history alarms ...")
 
-        hist_btn = MangoButton("Browse..", "Browse a file for pre history alarms", resource_path("resources/icon/search.png"))
+        hist_btn = MangoButton("Browse..", "Browse a file for pre history alarms", resource_path("resources/icon/browse.ico"))
         hist_btn.clicked.connect(lambda: self.browse(self.hist_edit))
 
         hist_layout.addWidget(self.hist_edit)
@@ -1006,7 +864,7 @@ class AlarmAnalyzerWidget(QWidget):
         self.post_hist_edit = MangoLineEdit()
         self.post_hist_edit.setPlaceholderText("Browse post history alarms ...")
 
-        post_hist_btn = MangoButton("Browse..", "Browse a file for post history alarms", resource_path("resources/icon/search.png"))
+        post_hist_btn = MangoButton("Browse..", "Browse a file for post history alarms", resource_path("resources/icon/browse.ico"))
         post_hist_btn.clicked.connect(lambda: self.browse(self.post_hist_edit))
 
         post_hist_layout.addWidget(self.post_hist_edit)
@@ -1019,11 +877,14 @@ class AlarmAnalyzerWidget(QWidget):
         layout.addWidget(post_hist_group)
 
         # ---------------- RUN BUTTON ----------------
-        self.run_btn = MangoButton("Run","CLick to Run", resource_path("resources/icon/run.png"))
+        run_btn = MangoButton("Run","CLick to Run", resource_path("resources/icon/run.png"))
 
-        self.run_btn.clicked.connect(self.run_analysis)
+        run_btn.clicked.connect(self.run_analysis)
 
-        layout.addWidget(self.run_btn, alignment=Qt.AlignHCenter)
+        layout.addWidget(run_btn, alignment=Qt.AlignHCenter)
+
+        #page.setLayout(layout)
+        #page.setMaximumWidth(600)
 
         self.tabs.addTab(page, "Input")
 
@@ -1140,46 +1001,8 @@ class AlarmAnalyzerWidget(QWidget):
         )
 
     def run_analysis(self):
-        if (
-                self.analysis_thread is not None
-                and self.analysis_thread.isRunning()
-        ):
-            return
-
-        sender = self.sender()
-        self.active_run_tab = None
-
-        # Delta button triggered analysis
-        if isinstance(sender, AlarmTable):
-            self.active_run_tab = sender
-            self.active_run_tab.start_run_animation()
-
-        # Main Run button triggered analysis
-        else:
-            self.start_run_animation()
-
-        # Only animate clicked Delta button
-        if self.active_run_tab is not None:
-            self.active_run_tab.start_run_animation()
-
-        # -----------------------------
-        # GET DELTA KEY COLUMNS
-        # -----------------------------
-        key_cols_active_delta = (
-            self.new_tab
-            .checkable_combo_delta
-            .checkedItems()
-        )
-
-        key_cols_history_delta = (
-            self.hist_new_tab
-            .checkable_combo_delta
-            .checkedItems()
-        )
-
-        # -----------------------------
-        # DEFAULT ACTIVE DELTA KEYS
-        # -----------------------------
+        key_cols_active_delta = self.new_tab.checkable_combo_delta.checkedItems()
+        key_cols_history_delta = self.hist_new_tab.checkable_combo_delta.checkedItems()
         if not key_cols_active_delta:
             key_cols_active_delta = [
                 "Alarm Number",
@@ -1187,18 +1010,9 @@ class AlarmAnalyzerWidget(QWidget):
                 "Distinguished Name",
                 "Severity",
             ]
+        self.new_tab.checkable_combo_delta.setCheckedItems(key_cols_active_delta)
+        self.cleared_tab.checkable_combo_delta.setCheckedItems(key_cols_active_delta)
 
-        self.new_tab.checkable_combo_delta.setCheckedItems(
-            key_cols_active_delta
-        )
-
-        self.cleared_tab.checkable_combo_delta.setCheckedItems(
-            key_cols_active_delta
-        )
-
-        # -----------------------------
-        # DEFAULT HISTORY DELTA KEYS
-        # -----------------------------
         if not key_cols_history_delta:
             key_cols_history_delta = [
                 "Alarm Number",
@@ -1206,289 +1020,148 @@ class AlarmAnalyzerWidget(QWidget):
                 "Distinguished Name",
                 "Severity",
             ]
+        self.hist_new_tab.checkable_combo_delta.setCheckedItems(key_cols_history_delta)
+        self.hist_cleared_tab.checkable_combo_delta.setCheckedItems(key_cols_history_delta)
+        # if not self.ui_loaded:
+        #     QMessageBox.warning(
+        #         self,
+        #         "Warning",
+        #         "Please select Analyzer → Browse Input Files first."
+        #     )
+        #     return
+        try:
+            # ----------------------------
+            # 1. LOAD FILES (SAFE)
+            # ----------------------------
 
-        self.hist_new_tab.checkable_combo_delta.setCheckedItems(
-            key_cols_history_delta
-        )
+            self.pre_df = self.load_csv_if_exists(self.pre_edit.text())
+            self.post_df = self.load_csv_if_exists(self.post_edit.text())
+            self.history_df = self.load_csv_if_exists(self.hist_edit.text())
+            self.post_history_df = self.load_csv_if_exists(self.post_hist_edit.text())
 
-        self.hist_cleared_tab.checkable_combo_delta.setCheckedItems(
-            key_cols_history_delta
-        )
+            # ----------------------------
+            # HELPER
+            # ----------------------------
+            def safe_display(df, columns):
+                if df is None or df.empty:
+                    return pd.DataFrame(columns=columns)
+                return df[[c for c in columns if c in df.columns]]
 
-        # -----------------------------
-        # READ GUI VALUES HERE
-        # -----------------------------
-        pre_path = self.pre_edit.text().strip()
-        post_path = self.post_edit.text().strip()
-        history_path = self.hist_edit.text().strip()
-        post_history_path = self.post_hist_edit.text().strip()
-
-        # -----------------------------
-        # UPDATE RUN BUTTON
-        # -----------------------------
-        #self.run_btn.setEnabled(False)
-        self.start_run_animation()
-
-        # -----------------------------
-        # CREATE THREAD
-        # -----------------------------
-        self.analysis_thread = QThread(self)
-
-        # -----------------------------
-        # CREATE WORKER
-        # -----------------------------
-        self.analysis_worker = AnalysisWorker(
-            pre_path=pre_path,
-            post_path=post_path,
-            history_path=history_path,
-            post_history_path=post_history_path,
-            key_cols_active_delta=key_cols_active_delta,
-            key_cols_history_delta=key_cols_history_delta,
-            status_file=self.get_status_file()
-        )
-
-        # Move worker into thread
-        self.analysis_worker.moveToThread(
-            self.analysis_thread
-        )
-
-        # -----------------------------
-        # CONNECTIONS
-        # -----------------------------
-        self.analysis_thread.started.connect(
-            self.analysis_worker.run
-        )
-
-        self.analysis_worker.finished.connect(
-            self.analysis_finished
-        )
-
-        self.analysis_worker.error.connect(
-            self.analysis_error
-        )
-
-        # Stop thread after success/error
-        self.analysis_worker.finished.connect(
-            self.analysis_thread.quit
-        )
-
-        self.analysis_worker.error.connect(
-            self.analysis_thread.quit
-        )
-
-        # Delete worker
-        self.analysis_thread.finished.connect(
-            self.analysis_worker.deleteLater
-        )
-
-        # Final cleanup
-        self.analysis_thread.finished.connect(
-            self.thread_finished
-        )
-
-        # -----------------------------
-        # START
-        # -----------------------------
-        self.analysis_thread.start()
-
-    def analysis_finished(self, result):
-
-        # -----------------------------
-        # STORE DATAFRAMES
-        # -----------------------------
-        self.pre_df = result["pre_df"]
-        self.post_df = result["post_df"]
-        self.history_df = result["history_df"]
-        self.post_history_df = result["post_history_df"]
-
-        new_df = result["new_df"]
-        cleared_df = result["cleared_df"]
-
-        hist_new_df = result["hist_new_df"]
-        hist_cleared_df = result["hist_cleared_df"]
-
-        # -----------------------------
-        # DISPLAY HELPER
-        # -----------------------------
-        def safe_display(df, columns):
-            if df is None or df.empty:
-                return pd.DataFrame(
-                    columns=columns
-                )
-
-            return df[
-                [
-                    col
-                    for col in columns
-                    if col in df.columns
-                ]
-            ].copy()
-
-        # -----------------------------
-        # MAIN TABLES
-        # -----------------------------
-        self.pre_tab.load_dataframe(
-            "pre_table",
-            safe_display(
+            # ----------------------------
+            # 2. LOAD MAIN TABLES
+            # ----------------------------
+            self.pre_tab.load_dataframe(
+                "pre_table",
+                safe_display(self.pre_df, DISPLAY_COLUMNS),
                 self.pre_df,
-                DISPLAY_COLUMNS
-            ),
-            self.pre_df
-        )
 
-        self.post_tab.load_dataframe(
-            "post_table",
-            safe_display(
+            )
+
+            self.post_tab.load_dataframe(
+                "post_table",
+                safe_display(self.post_df, DISPLAY_COLUMNS),
                 self.post_df,
-                DISPLAY_COLUMNS
-            ),
-            self.post_df
-        )
 
-        self.history_tab.load_dataframe(
-            "history_table",
-            safe_display(
+            )
+
+            self.history_tab.load_dataframe(
+                "history_table",
+                safe_display(self.history_df, DISPLAY_COLUMNS),
                 self.history_df,
-                DISPLAY_COLUMNS
-            ),
-            self.history_df
-        )
 
-        self.post_history_tab.load_dataframe(
-            "post_history",
-            safe_display(
+            )
+            # -----------------------------
+            # POST HISTORY TABLE
+            # -----------------------------
+            self.post_history_tab.load_dataframe(
+                "post_history",
+                safe_display(self.post_history_df, DISPLAY_COLUMNS),
                 self.post_history_df,
-                DISPLAY_COLUMNS
-            ),
-            self.post_history_df
-        )
 
-        # -----------------------------
-        # ACTIVE DELTA
-        # -----------------------------
-        self.new_tab.load_dataframe(
-            "active_delta_new_table",
-            safe_display(
+            )
+
+            # ----------------------------
+            # 3. PRE / POST DELTA
+            # ----------------------------
+            new_df, cleared_df = calculate_pre_post_delta(
+                self.pre_df,
+                self.post_df,
+                self.history_df,  # IMPORTANT
+                key_cols_active_delta
+            )
+
+            # ----------------------------
+            # 4. HISTORY DELTA (INDEPENDENT)
+            # ----------------------------
+            hist_new_df, hist_cleared_df = calculate_history_delta(
+                self.history_df,
+                self.post_history_df,
+                key_cols_history_delta
+            )
+
+            new_df = self.apply_status_to_dataframe(new_df)
+
+            hist_new_df = self.apply_status_to_dataframe(hist_new_df)
+
+            # ----------------------------
+            # 5. LOAD DELTA TABS (PRE/POST)
+            # ----------------------------
+
+            self.new_tab.load_dataframe(
+                "active_delta_new_table",
+                safe_display(new_df, DISPLAY_COLUMNS_NEW),
                 new_df,
-                DISPLAY_COLUMNS_NEW
-            ),
-            new_df,
-            "#d4ffd4"
-        )
+                "#d4ffd4",
 
-        self.new_tab.apply_saved_status()
+            )
+            self.new_tab.apply_saved_status()
 
-        self.cleared_tab.load_dataframe(
-            "active_delta_cleared_table",
-            safe_display(
+            self.cleared_tab.load_dataframe(
+                "active_delta_cleared_table",
+                safe_display(cleared_df, DISPLAY_COLUMNS),
                 cleared_df,
-                DISPLAY_COLUMNS
-            ),
-            cleared_df,
-            "#ffd4d4"
-        )
+                "#ffd4d4",
 
-        # -----------------------------
-        # HISTORY DELTA
-        # -----------------------------
-        self.hist_new_tab.load_dataframe(
-            "history_delta_new_table",
-            safe_display(
+            )
+
+            # ----------------------------
+            # 6. LOAD HISTORY DELTA TABS
+            # ----------------------------
+            self.hist_new_tab.load_dataframe(
+                "history_delta_new_table",
+                safe_display(hist_new_df, DISPLAY_COLUMNS_NEW),
                 hist_new_df,
-                DISPLAY_COLUMNS_NEW
-            ),
-            hist_new_df,
-            "#d4ffd4"
-        )
+                "#d4ffd4",
 
-        self.hist_cleared_tab.load_dataframe(
-            "history_delta_cleared_table",
-            safe_display(
+            )
+
+            self.hist_cleared_tab.load_dataframe(
+                "history_delta_cleared_table",
+                safe_display(hist_cleared_df, DISPLAY_COLUMNS),
                 hist_cleared_df,
-                DISPLAY_COLUMNS
-            ),
-            hist_cleared_df,
-            "#ffd4d4"
-        )
+                "#ffd4d4",
 
-        # -----------------------------
-        # UPDATE UI
-        # -----------------------------
-        self.update_counts()
-
-        self.switch_to_first_available_tab()
-
-        QMessageBox.information(
-            self,
-            "Done",
-            f"New alarms: {len(new_df)}\n"
-            f"Cleared alarms: {len(cleared_df)}\n\n"
-            f"History New: {len(hist_new_df)}\n"
-            f"History Cleared: {len(hist_cleared_df)}"
-        )
-
-    def analysis_error(self, message):
-
-        QMessageBox.critical(
-            self,
-            "Analysis Error",
-            message
-        )
-
-    def thread_finished(self):
-        # Stop main Run button animation
-        self.stop_run_animation()
-
-        # Stop the Delta button animation
-        if self.active_run_tab is not None:
-            self.active_run_tab.stop_run_animation()
-
-        self.active_run_tab = None
-
-        self.analysis_worker = None
-        self.analysis_thread = None
-
-
-
-    def start_run_animation(self):
-
-        self.run_movie = QMovie(
-            resource_path(
-                "resources/icon/loading.gif"
-            )
-        )
-
-        self.run_movie.frameChanged.connect(
-            self.update_run_button_icon
-        )
-
-        self.run_btn.setText("Running...")
-        self.run_movie.start()
-
-    def update_run_button_icon(self):
-
-        if self.run_movie is not None:
-            self.run_btn.setIcon(
-                QIcon(
-                    self.run_movie.currentPixmap()
-                )
             )
 
-    def stop_run_animation(self):
+            # ----------------------------
+            # 7. UPDATE UI
+            # ----------------------------
+            self.update_counts()
 
-        if self.run_movie is not None:
-            self.run_movie.stop()
-            self.run_movie = None
-
-        self.run_btn.setText("Run")
-
-        self.run_btn.setIcon(
-            QIcon(
-                resource_path(
-                    "resources/icon/run.png"
-                )
+            QMessageBox.information(
+                self,
+                "Done",
+                f"New alarms: {len(new_df)}\n"
+                f"Cleared alarms: {len(cleared_df)}\n\n"
+                f"History New: {len(hist_new_df)}\n"
+                f"History Cleared: {len(hist_cleared_df)}"
             )
-        )
+
+            self.switch_to_first_available_tab()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", str(e))
+
     def switch_to_first_available_tab(self):
 
         # Pre

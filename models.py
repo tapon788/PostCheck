@@ -53,7 +53,7 @@ class PandasModel(QAbstractTableModel):
                 history_match = self.get_history_match_flag(index.row())
 
                 if status == "true":
-                    return QIcon(resource_path("resources/icon/resolved2.png"))
+                    return QIcon(resource_path("resources/icon/resolved.png"))
 
 
                 elif status in ("false", ""):
@@ -100,6 +100,9 @@ class PandasModel(QAbstractTableModel):
                 }
 
                 return color_map.get(history_match)
+
+        if role == Qt.TextAlignmentRole:
+            return Qt.AlignCenter
 
         return None
 
@@ -207,30 +210,6 @@ class GlobalFilterProxy(QSortFilterProxyModel):
         if model is None:
             return True
 
-        # --------------------------------
-        # Existing global search
-        # --------------------------------
-        # if self.search_text:
-        #     global_match = False
-        #
-        #     for column in range(model.columnCount()):
-        #         index = model.index(
-        #             source_row,
-        #             column,
-        #             source_parent
-        #         )
-        #
-        #         value = str(
-        #             model.data(index, Qt.DisplayRole) or ""
-        #         ).lower()
-        #
-        #         if self.search_text in value:
-        #             global_match = True
-        #             break
-        #
-        #     if not global_match:
-        #         return False
-
         if self.search_text:
 
             # Combine all column values for this row
@@ -333,37 +312,7 @@ class GlobalFilterProxy(QSortFilterProxyModel):
                 return False
 
         return True
-    # def filterAcceptsRow(self, row, parent):
-    #
-    #     if not self.search_text:
-    #         return True
-    #
-    #     model = self.sourceModel()
-    #     if not model:
-    #         return False
-    #
-    #     column_count = model.columnCount(parent)
-    #
-    #     for col in range(column_count):
-    #
-    #         idx = model.index(row, col, parent)
-    #         value = model.data(idx, Qt.DisplayRole)
-    #
-    #         if value is None:
-    #             continue
-    #
-    #         # convert ONCE
-    #         value_str = str(value).lower()
-    #
-    #         if self.search_text in value_str:
-    #             return True
-    #
-    #     return False
-    #
-    # def sort(self, column, order):
-    #     source = self.sourceModel()
-    #     if source:
-    #         source.sort(column, order)
+
 
     def sort(self, column, order):
         super().sort(column, order)

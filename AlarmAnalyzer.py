@@ -16,7 +16,6 @@ from AlarmComparison.customUIs import CSVMergerDialog
 from AlarmComparison.helper_functions import resource_path
 from customUIs import AlarmAnalyzerWidget, ConfigAnalyzerWidget
 
-
 class MainWindow(MangoMainWindow):
 
     def __init__(self):
@@ -93,7 +92,7 @@ class MainWindow(MangoMainWindow):
         )
 
         browse_action.setIcon(
-            QIcon(resource_path("resources/icon/browsefiles.png"))
+            QIcon(resource_path("resources/icon/search.png"))
         )
 
         browse_action.triggered.connect(
@@ -106,7 +105,7 @@ class MainWindow(MangoMainWindow):
         )
 
         browse_action.setIcon(
-            QIcon(resource_path("resources/icon/browsefiles.png"))
+            QIcon(resource_path("resources/icon/browse.png"))
         )
 
         browse_action.triggered.connect(
@@ -134,7 +133,7 @@ class MainWindow(MangoMainWindow):
         )
 
         exit_action.setIcon(
-            QIcon(resource_path("resources/icon/exitapp.png"))
+            QIcon(resource_path("resources/icon/EXIT.png"))
         )
         exit_action.triggered.connect(
             self.close
