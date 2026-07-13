@@ -1,14 +1,20 @@
+# ======================== Imports ========================
+
 from PyQt5.QtCore import (
     Qt,
     QAbstractTableModel,
     QSortFilterProxyModel
 )
 
-from PyQt5.QtGui import QColor, QIcon
+from PyQt5.QtGui import (
+    QColor,
+    QIcon,
+)
 
 import pandas as pd
 
-from AlarmComparison.helper_functions import resource_path
+from global_functions.helper_functions import resource_path
+
 
 class PandasModel(QAbstractTableModel):
 

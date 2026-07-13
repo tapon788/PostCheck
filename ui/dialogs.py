@@ -1,9 +1,10 @@
+# ======================== Imports ========================
 
 
 from PyQt5.QtWidgets import  QTextEdit
 
 from PyQt5.QtGui import QIcon
-from PyQt5.QtCore import Qt, QDateTime, QTimer
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QVBoxLayout,
     QLabel,
@@ -11,13 +12,13 @@ from PyQt5.QtWidgets import (
 
 )
 
-from AlarmComparison.customwidgets import (
+from ui.customwidgets import (
     MangoButton,
     MangoLineEdit,
     MangoCheckBox,
 )
 
-from AlarmComparison.helper_functions import resource_path
+from global_functions.helper_functions import resource_path
 
 
 class StatusDialog(QDialog):

@@ -1,4 +1,5 @@
-import pandas as pd
+# ======================== Imports ========================
+
 
 KEY_COLUMNS = [
     "Supplementary Information",
@@ -24,6 +25,7 @@ def create_key(df):
 
     return df
 
+
 def build_key(df):
 
     key_cols = [
@@ -46,6 +48,8 @@ def build_key(df):
     )
 
     return df
+
+
 def calculate_delta(
         pre_df,
         post_df,
@@ -244,13 +248,6 @@ def calculate_history_delta(history_df: pd.DataFrame, post_history_df: pd.DataFr
     if history_df.empty or post_history_df.empty:
         return hist_new_df, hist_cleared_df
 
-    # key_cols = [
-    #     "Alarm Number",
-    #     "Supplementary Information",
-    #     "Distinguished Name",
-    #     "Diagnostic Info",
-    #     "Severity",
-    # ]
 
     def make_key(df):
         return (

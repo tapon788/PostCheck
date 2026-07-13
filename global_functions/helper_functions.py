@@ -1,4 +1,7 @@
+# ======================== Imports ========================
+
 import sys, os
+
 
 def resource_path(relative_path):
     base_path = getattr(sys, "_MEIPASS", os.path.dirname(sys.executable))

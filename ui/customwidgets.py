@@ -1,3 +1,6 @@
+# ======================== Imports ========================
+
+
 import os
 from PyQt5.QtWidgets import (
     QMainWindow, QPushButton, QLineEdit, QCheckBox, QGroupBox, QLabel,
@@ -101,7 +104,7 @@ class MangoGroupBox(QGroupBox):
 class MangoMainWindow(QMainWindow):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.setWindowTitle("PostCheck Analyzer")
+        self.setWindowTitle("PostCheck Analyzer V1.7.13")
         # self.resize(1400, 800)
 
 

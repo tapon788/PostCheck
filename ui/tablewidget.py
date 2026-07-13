@@ -1,3 +1,6 @@
+# ======================== Imports ========================
+
+
 import os
 import pandas as pd
 
@@ -15,19 +18,25 @@ from PyQt5.QtWidgets import (
     QLabel
 
 )
-from PyQt5.QtGui import QIcon, QMovie
-from AlarmComparison.customwidgets import (
+from PyQt5.QtGui import (
+    QIcon,
+    QMovie,
+)
+from ui.customwidgets import (
     MangoButton,
     MangoLineEdit,
     MangoCheckableComboBox,
 )
 
-from AlarmComparison.helper_functions import resource_path
+from global_functions.helper_functions import resource_path
 
-from AlarmComparison.models import PandasModel,GlobalFilterProxy
-from AlarmComparison.dialogs import DetailDialog
+from models.models import (
+    PandasModel,
+    GlobalFilterProxy,
+)
+from ui.dialogs import DetailDialog
 
-from dialogs import StatusDialog
+from ui.dialogs import StatusDialog
 
 
 class AlarmTable(QWidget):
@@ -630,15 +639,7 @@ class AlarmTable(QWidget):
             edit = MangoLineEdit(
                 self.column_filter_widget
             )
-
-            #edit.setPlaceholderText("Filter...")
-
-            # filter_action = edit.addAction(
-            #     QIcon(resource_path("resources/icon/browse.ico")),
-            #     MangoLineEdit.LeadingPosition
-            # )
             edit.setClearButtonEnabled(True)
-
             edit.textChanged.connect(
                 lambda text, col=column:
                 self.on_column_filter_changed(col, text)
