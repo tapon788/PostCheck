@@ -21,11 +21,11 @@ from ui.customwidgets import (
 )
 
 from global_functions.helper_functions import resource_path
+from ui.alarm_ui import AlarmAnalyzerWidget
+from ui.help_ui import HelpWidget
+from ui.config_ui import ConfigAnalyzerWidget
 from ui.customUIs import (
     CSVMergerDialog,
-    AlarmAnalyzerWidget,
-    ConfigAnalyzerWidget,
-    HelpWidget,
 )
 
 

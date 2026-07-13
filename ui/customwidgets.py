@@ -4,7 +4,7 @@
 import os
 from PyQt5.QtWidgets import (
     QMainWindow, QPushButton, QLineEdit, QCheckBox, QGroupBox, QLabel,
-    QComboBox, QStyledItemDelegate, QDateTimeEdit
+    QComboBox, QStyledItemDelegate, QDateTimeEdit, QPlainTextEdit, QListWidget
 
 )
 from PyQt5.QtGui import (
@@ -93,6 +93,18 @@ class MangoLineEdit(QLineEdit):
         """)
 
 
+class MangoPlainTextEdit(QPlainTextEdit):
+    def __init__(self):
+        super().__init__()
+        self.setStyleSheet("""
+        QPlainTextEdit{
+        padding: 5px;
+        border: 2px solid #ccc;
+        border-radius: 4px;
+        background-color: #fff8e1;  /* light mango-ish background */
+        }
+        """)
+
 class MangoGroupBox(QGroupBox):
     def __init__(self, title="", *args, **kwargs):
         super().__init__(title, *args, **kwargs)
@@ -148,6 +160,41 @@ class MangoDateTimeEdit(QDateTimeEdit):
         }
         """)
 
+
+class MangoComboBox(QComboBox):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("""
+            QComboBox {
+                min-height: 35px;
+                border: 2px solid #ccc;
+                border-radius: 4px;
+                background-color: #fff8e1;
+            }
+                        QComboBox QAbstractItemView {
+                background-color: #2b2b2b;
+                color: white;
+                border: 1px solid #555;
+                outline: none;
+                padding: 5px;
+                selection-background-color: #444;
+                selection-color: white;
+            }
+
+            QComboBox QAbstractItemView::item {
+                min-height: 30px;
+                padding: 4px 8px;
+            }
+
+            QComboBox QAbstractItemView::item:hover {
+                background-color: #444;
+            }
+
+            QComboBox QAbstractItemView::item:selected {
+                background-color: #555;
+                color: white;
+            }
+            """)
 
 class MangoCheckableComboBox(QComboBox):
     def __init__(self, parent=None):
@@ -273,3 +320,18 @@ class MangoCheckableComboBox(QComboBox):
     #
     #     super().hidePopup()
     #     self.updateText()
+
+
+class MangoListWidget(QListWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setStyleSheet("""
+        QListWidget{
+        background-color: #fff8e1;
+        padding: 5px;
+        border: 2px solid #ccc;
+        border-radius: 4px;
+        border-bottom: 2px solid #ccc;
+        }
+        """)
+
