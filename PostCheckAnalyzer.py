@@ -21,6 +21,7 @@ from ui.customwidgets import (
 )
 
 from global_functions.helper_functions import resource_path
+from ui.home_ui import CardDashboard
 from ui.alarm_ui import AlarmAnalyzerWidget
 from ui.help_ui import HelpWidget
 from ui.config_ui import ConfigAnalyzerWidget
@@ -34,10 +35,19 @@ class MainWindow(MangoMainWindow):
         super().__init__()
         self.container = QStackedWidget()
         self.setCentralWidget(self.container)
+        self.home_widget = None
         self.alarm_analyzer = None
         self.config_analyzer = None
         self.help_analyzer = None
         self.create_menu()
+        self.show_home()
+
+    def show_home(self):
+        if self.home_widget is None:
+            self.home_widget = CardDashboard(self.container)
+            self.container.addWidget(self.home_widget)
+
+        self.container.setCurrentWidget(self.home_widget)
 
     def show_alarm_analyzer(self):
         if self.alarm_analyzer is None:
@@ -63,6 +73,26 @@ class MainWindow(MangoMainWindow):
         # -------------------------
         # ALARM MENU
         # -------------------------
+        home_menu = menubar.addMenu("&Home")
+        home_action = home_menu.addAction(
+            "&Home"
+        )
+        home_action.setIcon(
+            QIcon(resource_path("resources/icon/PostCheckAnalyzer.ico"))
+        )
+        home_action.triggered.connect(
+            self.show_home
+        )
+
+        exit_action = home_menu.addAction(
+            "Exit"
+        )
+        exit_action.setIcon(
+            QIcon(resource_path("resources/icon/EXIT.png"))
+        )
+        exit_action.triggered.connect(
+            self.close
+        )
         analyzer_menu = menubar.addMenu("&Alarm")
         config_menu = menubar.addMenu("&Configuration")
         browse_action = analyzer_menu.addAction(
@@ -87,15 +117,7 @@ class MainWindow(MangoMainWindow):
         )
         analyzer_menu.addSeparator()
 
-        exit_action = analyzer_menu.addAction(
-            "Exit"
-        )
-        exit_action.setIcon(
-            QIcon(resource_path("resources/icon/EXIT.png"))
-        )
-        exit_action.triggered.connect(
-            self.close
-        )
+
         # -------------------------
         # CONFIG MENU
         # -------------------------

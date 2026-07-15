@@ -102,6 +102,8 @@ class MangoPlainTextEdit(QPlainTextEdit):
         border: 2px solid #ccc;
         border-radius: 4px;
         background-color: #fff8e1;  /* light mango-ish background */
+        font-size:8pt;
+        font-family:Courier;
         }
         """)
 

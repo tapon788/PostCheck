@@ -704,8 +704,7 @@ class AlarmAnalyzerWidget(QWidget):
         label = QLabel("Alarm Analyzer Inputs")
         label.setStyleSheet("""
         margin:25 0;
-        font-size:36px;
-        font-weight:bold;
+        font-size:30px;
         color:#447100;
         """)
         label.setAlignment(Qt.AlignCenter)

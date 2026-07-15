@@ -83,15 +83,10 @@ DEFAULT_PROFILES = {
     "CB005832 Fronthaul Loop Back": [
         "NRCELL",
         "RMOD_R",
-        "LTEENB",
-        "XNLINK",
-        "NRADJGNB",
-        "SERVEDAMF",
-        "IKEP",
-        "IKEP_R",
-        "IPSECP",
-        "SECPOL",
-        "SMOD_R",
+        "OAMMA",
+        "OAMMD",
+        "ETHAPP",
+        "FEATCADM"
     ],
 }
 
@@ -209,7 +204,13 @@ class FileInputPage(QWidget):
         card_layout.setSpacing(20)
 
         # Title
-        title = QLabel("Configuration Inputs")
+        title = QLabel("Configuration Analyzer Inputs")
+        title.setStyleSheet("""
+        margin:25 0;
+        font-size:30px;
+        
+        color:#447100;
+        """)
         title.setObjectName("title")
         title.setAlignment(Qt.AlignCenter)
         card_layout.addWidget(title)
@@ -305,7 +306,7 @@ class FileInputPage(QWidget):
         log_group = QGroupBox("Execution Log")
 
         log_layout = QVBoxLayout(log_group)
-        log_layout.setContentsMargins(0, 0, 0, 0)
+        log_layout.setContentsMargins(10, 2, 10, 10)
 
         self.log_output = MangoPlainTextEdit()
         self.log_output.setObjectName("logOutput")
@@ -317,8 +318,25 @@ class FileInputPage(QWidget):
 
         log_layout.addWidget(self.log_output)
 
+        view_result_layout = QHBoxLayout()
+        self.btn_open_result = MangoButton("", "Open result in excel",resource_path("resources/icon/open.svg"))
+        self.btn_open_result_folder = MangoButton("", "Open result directory", resource_path("resources/icon/folder.svg"))
+        btn_view_result = MangoButton("View Result", "View results", resource_path("resources/icon/result.png"))
+        self.btn_open_result.setEnabled(False)
+        self.btn_open_result_folder.setEnabled(False)
+        btn_view_result.setEnabled(False)
+        view_result_layout.addWidget(self.btn_open_result)
+        view_result_layout.addWidget(self.btn_open_result_folder)
+        view_result_layout.addWidget(btn_view_result)
+
+        self.result_file = None
+        self.output_dir = None
+        self.btn_open_result.clicked.connect(self.open_result)
+        self.btn_open_result_folder.clicked.connect(self.open_result_folder)
+        log_layout.addLayout(view_result_layout)
         # Add the whole group box to the card
         card_layout.addWidget(log_group)
+
 
         # Add card to centered row
         card_row.addWidget(self.card)
@@ -343,6 +361,12 @@ class FileInputPage(QWidget):
             base_dir,
             "profiles.json"
         )
+
+    def open_result(self):
+        os.startfile(self.result_file)
+
+    def open_result_folder(self):
+        os.startfile(self.output_dir)
     def add_profile(self):
         name, ok = QInputDialog.getText(
             self,
@@ -620,8 +644,10 @@ class FileInputPage(QWidget):
         # Create output file path
         # -------------------------
         input_folder = os.path.dirname(pre_xml)
-        folder_name = os.path.basename(input_folder)
 
+        folder_name = os.path.basename(input_folder)
+        self.output_dir = input_folder
+        print(input_folder)
         # Make profile name safe for filename
         safe_profile_name = "".join(
             char if char.isalnum() or char in ("-", "_")
@@ -633,6 +659,8 @@ class FileInputPage(QWidget):
             input_folder,
             f"{folder_name}_{safe_profile_name}_comparison.xlsx"
         )
+
+        self.result_file = output_file
 
         # -------------------------
         # Initial log information
@@ -749,6 +777,8 @@ class FileInputPage(QWidget):
         self.rat_combo.setEnabled(True)
         self.settings_button.setEnabled(True)
         self.add_profile_button.setEnabled(True)
+        self.btn_open_result.setEnabled(True)
+        self.btn_open_result_folder.setEnabled(True)
 
 
 class SheetOrderDialog(QDialog):

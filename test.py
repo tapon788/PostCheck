@@ -1,113 +1,294 @@
-import sys
-from PyQt5.QtCore import Qt, QEvent
-from PyQt5.QtGui import QStandardItem, QStandardItemModel
+from PyQt5.QtCore import Qt, pyqtSignal, QSize
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QApplication,
     QWidget,
+    QLabel,
     QVBoxLayout,
-    QComboBox,
-    QStyledItemDelegate,
+    QHBoxLayout,
+    QGridLayout,
+    QFrame,
+    QGraphicsDropShadowEffect,
+    QSizePolicy,
 )
+import sys
 
+from global_functions.helper_functions import resource_path
 
-class CheckableComboBox(QComboBox):
-    def __init__(self, parent=None):
+class FeatureCard(QFrame):
+    clicked = pyqtSignal()
+
+    def __init__(
+        self,
+        icon,
+        title,
+        description,
+        bullet_points=None,
+        parent=None
+    ):
         super().__init__(parent)
 
-        self.setModel(QStandardItemModel(self))
-        self.setEditable(True)
-        self.lineEdit().setReadOnly(True)
-        self.lineEdit().setPlaceholderText("Select...")
+        self.setObjectName("FeatureCard")
+        self.setCursor(Qt.PointingHandCursor)
+        self.setFixedSize(300, 300)
 
-        # Don't allow typing
-        self.lineEdit().setFocusPolicy(Qt.NoFocus)
+        self.normal_shadow = QGraphicsDropShadowEffect(self)
+        self.normal_shadow.setBlurRadius(18)
+        self.normal_shadow.setOffset(0, 4)
+        self.normal_shadow.setColor(Qt.gray)
+        self.setGraphicsEffect(self.normal_shadow)
 
-        # Better item height
-        self.setItemDelegate(QStyledItemDelegate(self))
+        # -------------------------
+        # Main layout
+        # -------------------------
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(12)
 
-        # Catch mouse events in popup
-        self.view().viewport().installEventFilter(self)
+        # Icon
+        self.icon_label = QLabel()
+        self.icon_label.setAlignment(Qt.AlignCenter)
+        self.icon_label.setPixmap(
+            QIcon(icon).pixmap(QSize(56, 56))
+        )
 
-        # Prevent current item text from replacing our display text
-        self.currentIndexChanged.connect(lambda: self.setCurrentIndex(-1))
+        # Title
+        self.title_label = QLabel(title)
+        self.title_label.setObjectName("CardTitle")
+        self.title_label.setAlignment(Qt.AlignCenter)
 
-    def addItem(self, text):
-        item = QStandardItem(text)
-        item.setFlags(Qt.ItemIsEnabled | Qt.ItemIsUserCheckable)
-        item.setData(Qt.Unchecked, Qt.CheckStateRole)
-        self.model().appendRow(item)
+        # Description
+        self.description_label = QLabel(description)
+        self.description_label.setObjectName("CardDescription")
+        self.description_label.setWordWrap(True)
+        self.description_label.setAlignment(Qt.AlignCenter)
 
-    def addItems(self, texts):
-        for text in texts:
-            self.addItem(text)
+        layout.addWidget(self.icon_label)
+        layout.addWidget(self.title_label)
+        layout.addWidget(self.description_label)
 
-    def eventFilter(self, obj, event):
-        if obj == self.view().viewport() and event.type() == QEvent.MouseButtonRelease:
+        # Bullet points
+        if bullet_points:
+            bullet_container = QWidget()
+            bullet_layout = QVBoxLayout(bullet_container)
+            bullet_layout.setContentsMargins(10, 8, 10, 0)
+            bullet_layout.setSpacing(6)
 
-            index = self.view().indexAt(event.pos())
+            for text in bullet_points:
+                bullet = QLabel(f"•  {text}")
+                bullet.setObjectName("BulletText")
+                bullet.setWordWrap(True)
+                bullet_layout.addWidget(bullet)
 
-            if index.isValid():
-                item = self.model().itemFromIndex(index)
+            layout.addWidget(bullet_container)
 
-                if item.checkState() == Qt.Checked:
-                    item.setCheckState(Qt.Unchecked)
-                else:
-                    item.setCheckState(Qt.Checked)
+        layout.addStretch()
 
-                self.updateText()
+        self.setStyleSheet("""
+            QFrame#FeatureCard {
+                background-color: white;
+                border: 1px solid #e2e8f0;
+                border-radius: 16px;
+            }
 
-                # Keep popup open
-                return True
+            QLabel#CardTitle {
+                color: #1e293b;
+                font-size: 18px;
+                font-weight: 600;
+            }
 
-        return super().eventFilter(obj, event)
+            QLabel#CardDescription {
+                color: #64748b;
+                font-size: 13px;
+            }
 
-    def hidePopup(self):
-        """
-        Don't close the popup after every click.
-        Close only when the user clicks outside or presses Esc.
-        """
-        if self.view().underMouse():
-            return
-        super().hidePopup()
+            QLabel#BulletText {
+                color: #475569;
+                font-size: 13px;
+            }
+        """)
 
-    def checkedItems(self):
-        result = []
+    def enterEvent(self, event):
+        self.normal_shadow.setBlurRadius(35)
+        self.normal_shadow.setOffset(0, 6)
+        self.normal_shadow.setColor(Qt.cyan)
 
-        for row in range(self.model().rowCount()):
-            item = self.model().item(row)
-            if item.checkState() == Qt.Checked:
-                result.append(item.text())
+        self.setStyleSheet("""
+            QFrame#FeatureCard {
+                background-color: white;
+                border: 2px solid #38bdf8;
+                border-radius: 16px;
+            }
 
-        return result
+            QLabel#CardTitle {
+                color: #0284c7;
+                font-size: 18px;
+                font-weight: 600;
+            }
 
-    def updateText(self):
-        self.lineEdit().setText(" + ".join(self.checkedItems()))
+            QLabel#CardDescription {
+                color: #64748b;
+                font-size: 13px;
+            }
+
+            QLabel#BulletText {
+                color: #475569;
+                font-size: 13px;
+            }
+        """)
+
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.normal_shadow.setBlurRadius(18)
+        self.normal_shadow.setOffset(0, 4)
+        self.normal_shadow.setColor(Qt.gray)
+
+        self.setStyleSheet("""
+            QFrame#FeatureCard {
+                background-color: white;
+                border: 1px solid #e2e8f0;
+                border-radius: 16px;
+            }
+
+            QLabel#CardTitle {
+                color: #1e293b;
+                font-size: 18px;
+                font-weight: 600;
+            }
+
+            QLabel#CardDescription {
+                color: #64748b;
+                font-size: 13px;
+            }
+
+            QLabel#BulletText {
+                color: #475569;
+                font-size: 13px;
+            }
+        """)
+
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.LeftButton:
+            self.clicked.emit()
+
+        super().mousePressEvent(event)
 
 
-class Window(QWidget):
+class CardDashboard(QWidget):
     def __init__(self):
         super().__init__()
 
-        layout = QVBoxLayout(self)
+        self.setWindowTitle("Feature Dashboard")
+        self.resize(1100, 700)
 
-        self.combo = CheckableComboBox()
+        self.cards = []
 
-        self.combo.addItems([
-            "Critical",
-            "Major",
-            "Minor",
-            "Warning",
-            "Info",
-            "Cleared",
-        ])
+        # Main layout centers everything
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(40, 40, 40, 40)
 
-        layout.addWidget(self.combo)
+        main_layout.addStretch()
+
+        # Horizontal centering
+        center_layout = QHBoxLayout()
+        center_layout.addStretch()
+
+        self.card_grid = QGridLayout()
+        self.card_grid.setHorizontalSpacing(24)
+        self.card_grid.setVerticalSpacing(24)
+
+        center_layout.addLayout(self.card_grid)
+        center_layout.addStretch()
+
+        main_layout.addLayout(center_layout)
+        main_layout.addStretch()
+
+        # Add cards
+        self.add_card(
+            resource_path("resources/icon/AlarmAnalyzerWidgetIcon.ico"),
+            "Alarm Analyzer",
+            "Analyze and compare network alarm files.",
+            [
+                "Compare pre and post alarms",
+                "Identify new and cleared alarms",
+                "Advanced filtering"
+            ],
+            self.open_alarm_analyzer
+        )
+
+        self.add_card(
+            resource_path("resources/icon/"),
+            "Configuration Analyzer",
+            "Analyze network configuration changes.",
+            [
+                "Compare configuration files",
+                "Detect parameter changes",
+                "Export analysis results"
+            ],
+            self.open_config_analyzer
+        )
+
+        self.add_card(
+            "icons/report.png",
+            "Report Generator",
+            "Create detailed analysis reports.",
+            [
+                "Generate Excel reports",
+                "Export filtered results",
+                "Create summaries"
+            ],
+            self.open_reports
+        )
+
+        self.setStyleSheet("""
+            CardDashboard {
+                background-color: #f4f7fb;
+            }
+        """)
+
+    def add_card(
+        self,
+        icon,
+        title,
+        description,
+        bullet_points,
+        callback
+    ):
+        card = FeatureCard(
+            icon=icon,
+            title=title,
+            description=description,
+            bullet_points=bullet_points
+        )
+
+        card.clicked.connect(callback)
+
+        index = len(self.cards)
+
+        # 3 cards per row
+        row = index // 3
+        column = index % 3
+
+        self.card_grid.addWidget(card, row, column)
+        self.cards.append(card)
+
+    def open_alarm_analyzer(self):
+        print("Opening Alarm Analyzer")
+
+    def open_config_analyzer(self):
+        print("Opening Configuration Analyzer")
+
+    def open_reports(self):
+        print("Opening Report Generator")
 
 
-app = QApplication(sys.argv)
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
 
-window = Window()
-window.resize(350, 100)
-window.show()
+    window = CardDashboard()
+    window.show()
 
-sys.exit(app.exec_())
+    sys.exit(app.exec_())

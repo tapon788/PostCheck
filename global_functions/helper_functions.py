@@ -217,6 +217,7 @@ def write_to_excel(result, output_file, sheet_order=None):
         written = set()
 
         def write_sheet(cls, df):
+            print(f"Working with {cls}")
             df.to_excel(writer, sheet_name=cls[:31], index=False)
             ws = writer.book[cls[:31]]
 
@@ -232,19 +233,19 @@ def write_to_excel(result, output_file, sheet_order=None):
             pre_col = headers.index("Pre") + 1
             post_col = headers.index("Post") + 1
 
-            # Highlight changes
-            for r in range(2, ws.max_row + 1):
-                pre_cell = ws.cell(r, pre_col)
-                post_cell = ws.cell(r, post_col)
-
-                if normalize(pre_cell.value) != normalize(post_cell.value):
-                    pre_cell.fill = red_fill
-                    post_cell.fill = green_fill
-
-            # Auto width
-            for col in ws.columns:
-                max_len = max(len(str(c.value)) if c.value else 0 for c in col)
-                ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 50)
+            # # Highlight changes
+            # for r in range(2, ws.max_row + 1):
+            #     pre_cell = ws.cell(r, pre_col)
+            #     post_cell = ws.cell(r, post_col)
+            #
+            #     if normalize(pre_cell.value) != normalize(post_cell.value):
+            #         pre_cell.fill = red_fill
+            #         post_cell.fill = green_fill
+            #
+            # # Auto width
+            # for col in ws.columns:
+            #     max_len = max(len(str(c.value)) if c.value else 0 for c in col)
+            #     ws.column_dimensions[col[0].column_letter].width = min(max_len + 2, 50)
 
         # write ordered sheets
         if sheet_order:
