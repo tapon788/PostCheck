@@ -164,26 +164,50 @@ class FeatureCard(QFrame):
 # CARD DASHBOARD
 # ============================================================
 
+
+
+
 class CardDashboard(QWidget):
+
+    # Navigation requests
+    alarmRequested = pyqtSignal()
+    configRequested = pyqtSignal()
+    reportRequested = pyqtSignal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.parent = parent
+
         self.cards = []
 
-
-        self.statusbar = self.parent.parent().statusBar()
-        self.config_widget = ConfigAnalyzerWidget()
-        self.alarm_widget = AlarmAnalyzerWidget(self.statusbar)
-
-        # ----------------------------------------------------
-        # Main layout
-        # ----------------------------------------------------
+        # ====================================================
+        # MAIN LAYOUT
+        # ====================================================
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(0)
 
         main_layout.addStretch()
+
+        # ====================================================
+        # COMMON ICON
+        # ====================================================
+        self.header_icon = QLabel()
+        self.header_icon.setAlignment(Qt.AlignCenter)
+
+        self.header_icon.setPixmap(
+            QIcon(
+                resource_path(
+                    "resources/icon/PostCheckAnalyzer.ico"
+                )
+            ).pixmap(QSize(72, 72))
+        )
+
+        main_layout.addWidget(
+            self.header_icon,
+            alignment=Qt.AlignCenter
+        )
+
+        main_layout.addSpacing(12)
 
         # ====================================================
         # COMMON TITLE
@@ -199,26 +223,6 @@ class CardDashboard(QWidget):
             }
         """)
 
-
-
-        # ====================================================
-        # COMMON ICON
-        # ====================================================
-        self.header_icon = QLabel()
-        self.header_icon.setAlignment(Qt.AlignCenter)
-
-        self.header_icon.setPixmap(
-            QIcon(resource_path("resources/icon/PostCheckAnalyzer.ico")).pixmap(
-                QSize(72, 72)
-            )
-        )
-
-        main_layout.addWidget(
-            self.header_icon,
-            alignment=Qt.AlignCenter
-        )
-
-        main_layout.addSpacing(12)
         main_layout.addWidget(
             self.header_title,
             alignment=Qt.AlignCenter
@@ -250,7 +254,9 @@ class CardDashboard(QWidget):
         # ====================================================
 
         self.add_card(
-            icon=resource_path("resources/icon/alarm.png"),
+            icon=resource_path(
+                "resources/icon/alarm.png"
+            ),
             title="Alarm Analyzer",
             description=(
                 "Analyze and compare network alarm files."
@@ -260,13 +266,15 @@ class CardDashboard(QWidget):
                 "Identify new and cleared alarms",
                 "Advanced filtering",
                 "Update status",
-                "Export analysis results"
+                "Export analysis results",
             ],
-            callback=self.open_alarm_analyzer
+            callback=self.alarmRequested.emit
         )
 
         self.add_card(
-            icon=resource_path("resources/icon/configurator.png"),
+            icon=resource_path(
+                "resources/icon/configurator.png"
+            ),
             title="Configuration Analyzer",
             description=(
                 "Analyze network configuration changes."
@@ -277,11 +285,15 @@ class CardDashboard(QWidget):
                 "Profile based compare",
                 "Export analysis results",
             ],
-            callback=self.open_config_analyzer
+            callback=self.configRequested.emit
         )
 
+        # Future Report Generator
+        #
         # self.add_card(
-        #     icon=resource_path("resources/icon/report.png"),
+        #     icon=resource_path(
+        #         "resources/icon/report.png"
+        #     ),
         #     title="Report Generator",
         #     description=(
         #         "Create detailed analysis reports."
@@ -291,10 +303,12 @@ class CardDashboard(QWidget):
         #         "Export filtered results",
         #         "Create summaries",
         #     ],
-        #     callback=self.open_reports
+        #     callback=self.reportRequested.emit
         # )
 
-        # Dashboard background
+        # ====================================================
+        # DASHBOARD STYLE
+        # ====================================================
         self.setStyleSheet("""
             CardDashboard {
                 background-color: #f4f7fb;
@@ -304,7 +318,6 @@ class CardDashboard(QWidget):
     # ========================================================
     # ADD CARD
     # ========================================================
-
     def add_card(
         self,
         icon,
@@ -324,9 +337,8 @@ class CardDashboard(QWidget):
 
         index = len(self.cards)
 
-        # 3 cards per row
-        row = index // 3
-        column = index % 3
+        columns = 3
+        row, column = divmod(index, columns)
 
         self.card_grid.addWidget(
             card,
@@ -335,29 +347,3 @@ class CardDashboard(QWidget):
         )
 
         self.cards.append(card)
-
-    # ========================================================
-    # CARD ACTIONS
-    # ========================================================
-
-    def open_alarm_analyzer(self):
-
-        if self.alarm_widget is None:
-            self.alarm_widget = AlarmAnalyzerWidget(self.parent.parent().statusBar())
-        self.parent.addWidget(self.alarm_widget)
-        self.parent.setCurrentWidget(self.alarm_widget)
-        self.alarm_widget.show_input_tab()
-
-        print("Opening Alarm Analyzer")
-
-    def open_config_analyzer(self):
-        if self.config_widget is None:
-            self.config_widget = ConfigAnalyzerWidget()
-        self.parent.addWidget(self.config_widget)
-        self.parent.setCurrentWidget(self.config_widget)
-
-
-        print("Opening Configuration Analyzer")
-
-    def open_reports(self):
-        print("Opening Report Generator")

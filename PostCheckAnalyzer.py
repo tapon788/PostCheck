@@ -33,34 +33,76 @@ from ui.customUIs import (
 class MainWindow(MangoMainWindow):
     def __init__(self):
         super().__init__()
+        # ====================================================
+        # STACKED WIDGET
+        # ====================================================
         self.container = QStackedWidget()
         self.setCentralWidget(self.container)
-        self.home_widget = None
-        self.alarm_analyzer = None
-        self.config_analyzer = None
-        self.help_analyzer = None
+
+        # ====================================================
+        # CREATE ALL PAGES
+        # ====================================================
+        self.dashboard = CardDashboard()
+
+        self.alarm_widget = AlarmAnalyzerWidget(
+            self.statusBar()
+        )
+
+        self.config_widget = ConfigAnalyzerWidget()
+
+        # ====================================================
+        # ADD PAGES TO STACK
+        # ====================================================
+        self.container.addWidget(
+            self.dashboard
+        )
+
+        self.container.addWidget(
+            self.alarm_widget
+        )
+
+        self.container.addWidget(
+            self.config_widget
+        )
+
+        # ====================================================
+        # CONNECT DASHBOARD SIGNALS
+        # ====================================================
+        self.dashboard.alarmRequested.connect(
+            self.show_alarm_analyzer
+        )
+
+        self.dashboard.configRequested.connect(
+            self.show_config_analyzer
+        )
+
+        # ====================================================
+        # INITIAL PAGE
+        # ====================================================
+        self.container.setCurrentWidget(
+            self.dashboard
+        )
         self.create_menu()
         self.show_home()
 
+    # NAVIGATION
+    # ========================================================
     def show_home(self):
-        if self.home_widget is None:
-            self.home_widget = CardDashboard(self.container)
-            self.container.addWidget(self.home_widget)
-
-        self.container.setCurrentWidget(self.home_widget)
+        self.container.setCurrentWidget(
+            self.dashboard
+        )
 
     def show_alarm_analyzer(self):
-        if self.alarm_analyzer is None:
-            self.alarm_analyzer = AlarmAnalyzerWidget(self.statusBar())
-            self.container.addWidget(self.alarm_analyzer)
-        self.container.setCurrentWidget(self.alarm_analyzer)
-        self.alarm_analyzer.show_input_tab()
+        self.container.setCurrentWidget(
+            self.alarm_widget
+        )
+
+        self.alarm_widget.show_input_tab()
 
     def show_config_analyzer(self):
-        if self.config_analyzer is None:
-            self.config_analyzer = ConfigAnalyzerWidget()
-            self.container.addWidget(self.config_analyzer)
-        self.container.setCurrentWidget(self.config_analyzer)
+        self.container.setCurrentWidget(
+            self.config_widget
+        )
 
     def show_help(self):
         if self.help_analyzer is None:
