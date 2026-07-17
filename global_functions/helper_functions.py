@@ -21,6 +21,8 @@ DISPLAY_COLUMNS = [
     "Distinguished Name",
     "Diagnostic Info",
     "Name",
+    "Count",
+    "DN_Base"
 ]
 
 DISPLAY_COLUMNS_NEW = [
@@ -39,7 +41,14 @@ DISPLAY_COLUMNS_NEW = [
     "History Count",
 ]
 
-
+DATE_COLUMNS = {
+    "Alarm Time",
+    "Cancel Time",
+    "Alarm Insertion Time",
+    "Alarm Update Time",
+    "Origin Alarm Time",
+    "Origin Cancel Time",
+}
 
 # =========================
 # XML PARSER (namespace-safe)

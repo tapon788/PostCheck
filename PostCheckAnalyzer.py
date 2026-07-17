@@ -14,6 +14,7 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QApplication,
     QStackedWidget,
+    QMainWindow
 )
 
 from ui.customwidgets import (
@@ -30,7 +31,7 @@ from ui.customUIs import (
 )
 
 
-class MainWindow(MangoMainWindow):
+class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         # ====================================================

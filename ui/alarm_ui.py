@@ -49,6 +49,7 @@ from global_functions.helper_functions import (
     resource_path,
     DISPLAY_COLUMNS,
     DISPLAY_COLUMNS_NEW,
+    DATE_COLUMNS,
 )
 
 from ui.tablewidget import AlarmTable
@@ -78,12 +79,22 @@ class AnalysisWorker(QObject):
         if not path:
             return pd.DataFrame()
 
-        return pd.read_csv(
+        df  = pd.read_csv(
             path,
             dtype=str,
             keep_default_na=False,
             low_memory=False
         )
+
+        for col in DATE_COLUMNS:
+            if col in df.columns:
+                df[col] = pd.to_datetime(
+                    df[col],
+                    format="%Y-%m-%d %H:%M:%S",
+                    errors="coerce"
+                )#.dt.strftime("%m-%d %H:%M:%S")
+
+        return df
 
     def apply_status_to_dataframe(self, df):
         if df.empty:
@@ -488,6 +499,9 @@ class AlarmAnalyzerWidget(QWidget):
         run_btn = MangoButton("Filter", "Filter Data", resource_path("resources/icon/filter.png"))
         run_btn.clicked.connect(self.run_history_analysis)
 
+        run_summary_btn = MangoButton("Summary", "Get the summary", resource_path("resource/icon/filter.png"))
+        run_summary_btn.clicked.connect(self.run_history_filtered_summary)
+
         filter_layout.addWidget(QLabel("Alarm Time From"))
         filter_layout.addWidget(self.alarm_time_from_edit)
         filter_layout.addSpacing(80)
@@ -495,6 +509,7 @@ class AlarmAnalyzerWidget(QWidget):
         filter_layout.addWidget(self.alarm_time_to_edit)
         filter_layout.addSpacing(80)
         filter_layout.addWidget(run_btn)
+        filter_layout.addWidget(run_summary_btn)
         filter_layout.addStretch()
 
         layout.addLayout(filter_layout)
@@ -562,11 +577,11 @@ class AlarmAnalyzerWidget(QWidget):
         # -----------------------------
         # DATETIME CONVERSION (SAFE)
         # -----------------------------
-        history["Alarm Time"] = pd.to_datetime(
-            history["Alarm Time"],
-            errors="coerce",
-            utc=True
-        )
+        # history["Alarm Time"] = pd.to_datetime(
+        #     history["Alarm Time"],
+        #     errors="coerce",
+        #     utc=True
+        # )
 
         print("NaT COUNT:", history["Alarm Time"].isna().sum())
 
@@ -582,8 +597,8 @@ class AlarmAnalyzerWidget(QWidget):
         alarm_to = self.alarm_time_to_edit.dateTime().toPyDateTime()
 
         # convert UI time to UTC for consistency
-        alarm_from = pd.to_datetime(alarm_from, utc=True)
-        alarm_to = pd.to_datetime(alarm_to, utc=True)
+        # alarm_from = pd.to_datetime(alarm_from, utc=True)
+        # alarm_to = pd.to_datetime(alarm_to, utc=True)
 
         result = history[
             (history["Alarm Time"] >= alarm_from) &
@@ -613,6 +628,70 @@ class AlarmAnalyzerWidget(QWidget):
         # UPDATE UI
         # -----------------------------
         self.update_counts()
+
+    def run_history_filtered_summary(self):
+        page = QWidget()
+        layout = QVBoxLayout()
+        self.history_summary_tab = AlarmTable(filename=self.session)
+
+        # -----------------------------
+        # TABLE
+        # -----------------------------
+        layout.addWidget(self.history_summary_tab)
+
+        page.setLayout(layout)
+
+        #self.tabs.addTab(page, "History Summary")
+        model = self.history_filter_tab.table.model().sourceModel()
+        df = model.df.copy()
+
+        df["DN_Base"] = df["Distinguished Name"].str.rsplit("-", n=1).str[0]
+        summary = (
+            df.groupby(["Supplementary Information","DN_Base"])
+            .size()
+            .reset_index(name="Count")
+            .sort_values(
+                ["DN_Base", "Count"],
+                ascending=[True, False]
+            )
+        )
+
+        # -----------------------------
+        # DISPLAY PREPARATION
+        # -----------------------------
+        display_df = summary[
+            [c for c in DISPLAY_COLUMNS if c in summary.columns]
+        ].copy()
+
+        print(summary.dtypes)
+        print(display_df.dtypes)
+        print(summary["Count"].head().tolist())
+        print(display_df["Count"].head().tolist())
+
+        # -----------------------------
+        # LOAD INTO TABLE
+        # -----------------------------
+        self.history_summary_tab.load_dataframe(
+            "history_summary",
+            display_df,
+            summary,
+            "#fff2cc"
+        )
+
+        # diaglog = SummaryDialog(page, self)
+        # diaglog.exec_()
+
+        self.summary_widget = SummaryDialog(page)
+        self.summary_widget.setWindowFlag(Qt.Window)
+        self.summary_widget.show()
+
+        # -----------------------------
+        # UPDATE UI
+        # -----------------------------
+        self.update_counts()
+
+
+
 
     def get_current_alarm_table(self):
 
@@ -850,12 +929,22 @@ class AlarmAnalyzerWidget(QWidget):
         if not path:
             return pd.DataFrame()
 
-        return pd.read_csv(
+        df = pd.read_csv(
             path,
             dtype=str,
             keep_default_na=False,
             low_memory=False
         )
+
+        for col in DATE_COLUMNS:
+            if col in df.columns:
+                df[col] = pd.to_datetime(
+                    df[col],
+                    format="%Y-%m-%d %H:%M:%S",
+                    errors="coerce"
+                )#.dt.strftime("%m-%d %H:%M:%S")
+
+        return df
 
     def get_status_file(self):
 
@@ -1310,3 +1399,16 @@ class AlarmAnalyzerWidget(QWidget):
 
         # fallback
         self.tabs.setCurrentIndex(0)
+
+
+
+class SummaryDialog(QDialog):
+
+    def __init__(self, widget, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Alarm Summary")
+        self.resize(1000, 700)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(widget)

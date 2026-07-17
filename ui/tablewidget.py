@@ -197,6 +197,7 @@ class AlarmTable(QWidget):
             "Supplementary Information",
             "Distinguished Name",
             "Diagnostic Info"
+
         ]
 
         file = f"{self.filename}.csv"

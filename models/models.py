@@ -12,20 +12,14 @@ from PyQt5.QtGui import (
 )
 
 import pandas as pd
+import numbers
 
 from global_functions.helper_functions import resource_path
 
-
+from global_functions.helper_functions import DATE_COLUMNS
 class PandasModel(QAbstractTableModel):
 
-    DATE_COLUMNS = {
-        "Alarm Time",
-        "Cancel Time",
-        "Alarm Insertion Time",
-        "Alarm Update Time",
-        "Origin Alarm Time",
-        "Origin Cancel Time",
-    }
+
 
     def __init__(self, df, color=None, table_name=None):
         super().__init__()
@@ -72,13 +66,23 @@ class PandasModel(QAbstractTableModel):
         # -----------------------------
         if role == Qt.DisplayRole:
 
+
+
             if column_name == "Resolved":
                 return ""
 
             value = self.df.iloc[index.row(), index.column()]
-            if value == 'nan':
+
+            if column_name == "Alarm Time":
+                return str(value)
+            if pd.isna(value):
                 return ""
-            return str(value)
+
+            # Convert NumPy scalar to native Python type
+            if hasattr(value, "item"):
+                value = value.item()
+
+            return value
 
         # -----------------------------
         # BACKGROUND
@@ -136,7 +140,9 @@ class PandasModel(QAbstractTableModel):
         return section + 1
 
     def sort(self, column, order):
-
+        print("PandasModel.sort() called")
+        print("Column:", column)
+        print("Order:", order)
         # -------------------------
         # SAFETY CHECK (IMPORTANT)
         # -------------------------
@@ -157,7 +163,7 @@ class PandasModel(QAbstractTableModel):
         # -------------------------
         # DATE COLUMNS
         # -------------------------
-        if col_name in self.DATE_COLUMNS:
+        if col_name in DATE_COLUMNS:
 
             df[col_name] = pd.to_datetime(
                 df[col_name],
@@ -322,3 +328,36 @@ class GlobalFilterProxy(QSortFilterProxyModel):
 
     def sort(self, column, order):
         super().sort(column, order)
+
+
+    def lessThan(self, left, right):
+
+        left_data = self.sourceModel().data(left, Qt.DisplayRole)
+        right_data = self.sourceModel().data(right, Qt.DisplayRole)
+
+        # Empty values always last
+        if left_data in ("", None):
+            return False
+        if right_data in ("", None):
+            return True
+
+        # --------------------------------------------------
+        # Numeric comparison
+        # --------------------------------------------------
+        if isinstance(left_data, numbers.Number) and isinstance(right_data, numbers.Number):
+            return left_data < right_data
+
+        # --------------------------------------------------
+        # Datetime comparison
+        # --------------------------------------------------
+        try:
+            left_dt = pd.to_datetime(left_data, errors="raise")
+            right_dt = pd.to_datetime(right_data, errors="raise")
+            return left_dt < right_dt
+        except Exception:
+            pass
+
+        # --------------------------------------------------
+        # String comparison (case-insensitive)
+        # --------------------------------------------------
+        return str(left_data).lower() < str(right_data).lower()
