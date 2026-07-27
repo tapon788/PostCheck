@@ -54,7 +54,7 @@ class AlarmTable(QWidget):
         self.search.setPlaceholderText("Global Filter ...")
         self.search_timer = QTimer()
         self.search_timer.setSingleShot(True)
-        self.search_timer.setInterval(500)
+        self.search_timer.setInterval(1000)
         self.search_timer.timeout.connect(self.apply_search)
 
         self.export_btn = MangoButton("","Export Data", resource_path("resources/icon/export.png"))
@@ -623,6 +623,43 @@ class AlarmTable(QWidget):
         #self.resize_cols("Resolved", 30)
 
         self.create_column_filters()
+
+    def clearAll(self):
+        # -----------------------------
+        # Global filter
+        # -----------------------------
+        self.search.clear()
+        self.proxy.setSearch("")
+
+        # -----------------------------
+        # Column filters
+        # -----------------------------
+        for edit in self.column_filter_edits:
+            edit.clear()
+
+        # -----------------------------
+        # Remove sorting
+        # -----------------------------
+        header = self.table.horizontalHeader()
+        header.setSortIndicator(-1, Qt.AscendingOrder)
+
+        # -----------------------------
+        # Clear selection
+        # -----------------------------
+        self.table.clearSelection()
+
+        # -----------------------------
+        # Scroll to top
+        # -----------------------------
+        self.table.scrollToTop()
+
+        # -----------------------------
+        # Optional: clear current model
+        # -----------------------------
+        self.proxy.setSourceModel(None)
+        self.table.setModel(None)
+
+        self.df = pd.DataFrame()
 
     def create_column_filters(self):
 

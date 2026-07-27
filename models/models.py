@@ -25,8 +25,16 @@ class PandasModel(QAbstractTableModel):
         super().__init__()
         self.table_name = table_name
         self.df = df.copy()   # ✅ FIX: use same attribute everywhere
+        self.build_search_cache()
         self.row_color = color
 
+    def build_search_cache(self):
+        self.search_cache = (
+            self.df.fillna("")
+            .astype(str)
+            .agg(" ".join, axis=1)
+            .str.lower()
+        )
     def rowCount(self, parent=None):
         return len(self.df)
 
@@ -189,175 +197,216 @@ class PandasModel(QAbstractTableModel):
                 na_position="last"
             )
 
+
         self.df = df.reset_index(drop=True)
 
+        self.build_search_cache()
 
         self.layoutChanged.emit()
+
+
+
+# import numbers
+# import pandas as pd
+# from PyQt5.QtCore import Qt, QSortFilterProxyModel
 
 
 class GlobalFilterProxy(QSortFilterProxyModel):
 
     def __init__(self):
         super().__init__()
+
         self.search_text = ""
+
+        self.search_positive = []
+        self.search_negative = []
+
+        # column -> {"positive":[...], "negative":[...]}
         self.column_filters = {}
 
+    # ----------------------------------------------------
+    # GLOBAL SEARCH
+    # ----------------------------------------------------
+
     def setSearch(self, text):
+
         self.search_text = text.strip().lower()
+
+        terms = [
+            t.strip()
+            for t in self.search_text.split("|")
+            if t.strip()
+        ]
+
+        self.search_positive = [
+            t for t in terms
+            if not t.startswith("!")
+        ]
+
+        self.search_negative = [
+            t[1:]
+            for t in terms
+            if t.startswith("!") and len(t) > 1
+        ]
+
         self.invalidateFilter()
+
+    # ----------------------------------------------------
+    # COLUMN FILTER
+    # ----------------------------------------------------
 
     def setColumnFilter(self, column, text):
+
         text = text.strip().lower()
 
-        if text:
-            self.column_filters[column] = text
-        else:
+        if not text:
             self.column_filters.pop(column, None)
+            self.invalidateFilter()
+            return
+
+        terms = [
+            t.strip()
+            for t in text.split("|")
+            if t.strip()
+        ]
+
+        self.column_filters[column] = {
+            "positive": [
+                t for t in terms
+                if not t.startswith("!")
+            ],
+            "negative": [
+                t[1:]
+                for t in terms
+                if t.startswith("!") and len(t) > 1
+            ]
+        }
 
         self.invalidateFilter()
 
+    # ----------------------------------------------------
+    # FILTERING
+    # ----------------------------------------------------
+
     def filterAcceptsRow(self, source_row, source_parent):
+
         model = self.sourceModel()
 
         if model is None:
             return True
 
+        df = model.df
+
+        # ============================================
+        # GLOBAL SEARCH
+        # ============================================
+
         if self.search_text:
 
-            # Combine all column values for this row
-            row_values = []
-
-            for column in range(model.columnCount()):
-                index = model.index(
-                    source_row,
-                    column,
-                    source_parent
-                )
-
-                value = str(
-                    model.data(index, Qt.DisplayRole) or ""
-                ).lower()
-
-                row_values.append(value)
-
-            # Treat the whole row as searchable text
-            row_text = " ".join(row_values)
-
-            # Split: abc | def | !xyz
-            terms = [
-                term.strip()
-                for term in self.search_text.split("|")
-                if term.strip()
-            ]
-
-            positive_terms = [
-                term
-                for term in terms
-                if not term.startswith("!")
-            ]
-
-            negative_terms = [
-                term[1:].strip()
-                for term in terms
-                if term.startswith("!") and len(term) > 1
-            ]
-
-            # Reject if ANY excluded term exists anywhere in the row
-            if any(
-                    term in row_text
-                    for term in negative_terms
-            ):
-                return False
-
-            # If positive terms exist, at least ONE must exist
-            if positive_terms and not any(
-                    term in row_text
-                    for term in positive_terms
-            ):
-                return False
-
-
-        # --------------------------------
-        # Per-column filters
-        # --------------------------------
-
-    # Per-column filters
-        for column, filter_text in self.column_filters.items():
-
-            index = model.index(
-                source_row,
-                column,
-                source_parent
+            row_text = " ".join(
+                str(df.iat[source_row, c]).lower()
+                for c in range(df.shape[1])
             )
 
-            value = str(
-                model.data(index, Qt.DisplayRole) or ""
-            ).lower()
-
-            # Split by | and remove surrounding spaces
-            terms = [
-                term.strip()
-                for term in filter_text.split("|")
-                if term.strip()
-            ]
-
-            positive_terms = [
-                term
-                for term in terms
-                if not term.startswith("!")
-            ]
-
-            negative_terms = [
-                term[1:].strip()
-                for term in terms
-                if term.startswith("!") and len(term) > 1
-            ]
-
-            # Exclude if ANY negative term matches
-            if any(term in value for term in negative_terms):
+            if any(
+                term in row_text
+                for term in self.search_negative
+            ):
                 return False
 
-            # If positive terms exist, at least ONE must match
-            if positive_terms and not any(
-                    term in value for term in positive_terms
+            if (
+                self.search_positive
+                and not any(
+                    term in row_text
+                    for term in self.search_positive
+                )
+            ):
+                return False
+
+        # ============================================
+        # COLUMN FILTERS
+        # ============================================
+
+        for column, filters in self.column_filters.items():
+
+            value = str(
+                df.iat[source_row, column]
+            ).lower()
+
+            if any(
+                term in value
+                for term in filters["negative"]
+            ):
+                return False
+
+            if (
+                filters["positive"]
+                and not any(
+                    term in value
+                    for term in filters["positive"]
+                )
             ):
                 return False
 
         return True
 
+    # ----------------------------------------------------
+    # SORTING
+    # ----------------------------------------------------
 
     def sort(self, column, order):
         super().sort(column, order)
 
+    # ----------------------------------------------------
+    # SMART SORT
+    # ----------------------------------------------------
 
     def lessThan(self, left, right):
 
-        left_data = self.sourceModel().data(left, Qt.DisplayRole)
-        right_data = self.sourceModel().data(right, Qt.DisplayRole)
+        left_data = self.sourceModel().data(
+            left,
+            Qt.DisplayRole
+        )
 
-        # Empty values always last
+        right_data = self.sourceModel().data(
+            right,
+            Qt.DisplayRole
+        )
+
         if left_data in ("", None):
             return False
+
         if right_data in ("", None):
             return True
 
-        # --------------------------------------------------
-        # Numeric comparison
-        # --------------------------------------------------
-        if isinstance(left_data, numbers.Number) and isinstance(right_data, numbers.Number):
+        # Numeric
+        if (
+            isinstance(left_data, numbers.Number)
+            and
+            isinstance(right_data, numbers.Number)
+        ):
             return left_data < right_data
 
-        # --------------------------------------------------
-        # Datetime comparison
-        # --------------------------------------------------
+        # Date
         try:
-            left_dt = pd.to_datetime(left_data, errors="raise")
-            right_dt = pd.to_datetime(right_data, errors="raise")
+            left_dt = pd.to_datetime(
+                left_data,
+                errors="raise"
+            )
+
+            right_dt = pd.to_datetime(
+                right_data,
+                errors="raise"
+            )
+
             return left_dt < right_dt
+
         except Exception:
             pass
 
-        # --------------------------------------------------
-        # String comparison (case-insensitive)
-        # --------------------------------------------------
-        return str(left_data).lower() < str(right_data).lower()
+        # Text
+        return (
+            str(left_data).lower()
+            <
+            str(right_data).lower()
+        )

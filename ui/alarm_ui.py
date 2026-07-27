@@ -59,6 +59,7 @@ from ui.tablewidget import AlarmTable
 
 class AnalysisWorker(QObject):
     finished = pyqtSignal(object)
+    # finish_msg = pyqtSignal(object)
     error = pyqtSignal(str)
 
     def __init__(self, pre_path, post_path, history_path, post_history_path, key_cols_active_delta,
@@ -211,6 +212,7 @@ class AnalysisWorker(QObject):
             }
 
             self.finished.emit(result)
+            # self.finish_msg.emit("PPP")
 
         except Exception as e:
             self.error.emit(str(e))
@@ -1008,6 +1010,17 @@ class AlarmAnalyzerWidget(QWidget):
         )
 
     def run_analysis(self):
+        # Clear all tabs
+        self.pre_tab.clearAll()
+        self.post_tab.clearAll()
+        self.new_tab.clearAll()
+        self.cleared_tab.clearAll()
+        self.history_tab.clearAll()
+        self.post_history_tab.clearAll()
+        self.hist_new_tab.clearAll()
+        self.hist_cleared_tab.clearAll()
+        self.history_filter_tab.clearAll()
+
         if (
                 self.analysis_thread is not None
                 and self.analysis_thread.isRunning()
@@ -1131,6 +1144,9 @@ class AlarmAnalyzerWidget(QWidget):
             self.analysis_finished
         )
 
+        # self.analysis_worker.finish_msg.connect(
+        #     self.show_msg
+        # )
         self.analysis_worker.error.connect(
             self.analysis_error
         )
@@ -1149,15 +1165,17 @@ class AlarmAnalyzerWidget(QWidget):
             self.analysis_worker.deleteLater
         )
 
-        # Final cleanup
-        self.analysis_thread.finished.connect(
-            self.thread_finished
-        )
+
 
         # -----------------------------
         # START
         # -----------------------------
         self.analysis_thread.start()
+
+        # Final cleanup
+        self.analysis_thread.finished.connect(
+            self.thread_finished
+        )
 
     def analysis_finished(self, result):
 
@@ -1295,6 +1313,12 @@ class AlarmAnalyzerWidget(QWidget):
             f"Cleared History Alarms: {len(hist_cleared_df)}"
         )
 
+        self.stop_run_animation()
+
+
+    # def show_msg(self, ppp):
+    #     QMessageBox.information(self,ppp)
+
     def analysis_error(self, message):
 
         QMessageBox.critical(
@@ -1305,7 +1329,7 @@ class AlarmAnalyzerWidget(QWidget):
 
     def thread_finished(self):
         # Stop main Run button animation
-        self.stop_run_animation()
+
 
         # Stop the Delta button animation
         if self.active_run_tab is not None:
@@ -1355,6 +1379,7 @@ class AlarmAnalyzerWidget(QWidget):
                 )
             )
         )
+
 
     def switch_to_first_available_tab(self):
 
