@@ -25,7 +25,14 @@ class PandasModel(QAbstractTableModel):
         super().__init__()
         self.table_name = table_name
         self.df = df.copy()   # ✅ FIX: use same attribute everywhere
-        self.build_search_cache()
+        # -----------------------------------
+        # Build search cache only when needed
+        # -----------------------------------
+        if not self.df.empty:
+            self.build_search_cache()
+        else:
+            self.search_cache = None
+
         self.row_color = color
 
     def build_search_cache(self):
@@ -83,6 +90,10 @@ class PandasModel(QAbstractTableModel):
 
             if column_name == "Alarm Time":
                 return str(value)
+
+            if column_name == "Cancel Time":
+                return str(value)
+
             if pd.isna(value):
                 return ""
 

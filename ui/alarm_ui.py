@@ -647,14 +647,24 @@ class AlarmAnalyzerWidget(QWidget):
         model = self.history_filter_tab.table.model().sourceModel()
         df = model.df.copy()
 
-        df["DN_Base"] = df["Distinguished Name"].str.rsplit("-", n=1).str[0]
+        #df["DN_Base"] = df["Distinguished Name"].str.rsplit("-", n=1).str[0]
+        # summary = (
+        #     df.groupby(["Supplementary Information","DN_Base"])
+        #     .size()
+        #     .reset_index(name="Count")
+        #     .sort_values(
+        #         ["DN_Base", "Count"],
+        #         ascending=[True, False]
+        #     )
+        # )
+
         summary = (
-            df.groupby(["Supplementary Information","DN_Base"])
+            df.groupby(["Supplementary Information","Alarm Number", "Alarm Text"])
             .size()
             .reset_index(name="Count")
             .sort_values(
-                ["DN_Base", "Count"],
-                ascending=[True, False]
+                ["Count"],
+                ascending=[True]
             )
         )
 
@@ -1235,7 +1245,7 @@ class AlarmAnalyzerWidget(QWidget):
             "history_table",
             safe_display(
                 self.history_df,
-                DISPLAY_COLUMNS
+                DISPLAY_COLUMNS_NEW
             ),
             self.history_df
         )
@@ -1244,7 +1254,7 @@ class AlarmAnalyzerWidget(QWidget):
             "post_history",
             safe_display(
                 self.post_history_df,
-                DISPLAY_COLUMNS
+                DISPLAY_COLUMNS_NEW
             ),
             self.post_history_df
         )

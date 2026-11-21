@@ -15,7 +15,8 @@ from PyQt5.QtWidgets import (
     QMessageBox,
     QMenu,
     QHeaderView,
-    QLabel
+    QLabel,
+    QDialog,
 
 )
 from PyQt5.QtGui import (
@@ -37,6 +38,8 @@ from models.models import (
 from ui.dialogs import DetailDialog
 
 from ui.dialogs import StatusDialog
+
+
 
 
 class AlarmTable(QWidget):
@@ -542,10 +545,10 @@ class AlarmTable(QWidget):
                 ] = status_lookup[key]["Resolved"]
 
     def show_context_menu(self, pos):
-        if not self.enable_status_tracking:
-            return
+        # if not self.enable_status_tracking:
+        #     return
         index = self.table.indexAt(pos)
-
+        context_df = self.get_dataframe()
         if not index.isValid():
             return
 
@@ -555,39 +558,71 @@ class AlarmTable(QWidget):
             source_index.column()
         ]
 
-        if col_name != "Status":
-            return
+        if col_name == "Status":
 
-        menu = QMenu(self)
+            menu = QMenu(self)
 
-        update_action = menu.addAction(
-            "Update Status"
-        )
+            update_action = menu.addAction(
+                "Update Status"
+            )
 
-        update_action.setIcon(QIcon(resource_path('resources/icon/update.ico')))
-        open_status_action = menu.addAction(
-            "Open Status DB"
-        )
-        open_status_action.setIcon(QIcon(resource_path('resources/icon/open.ico')))
-        clear_all_status_action = menu.addAction(
-            "Clear All Status"
-        )
-        clear_all_status_action.setIcon(QIcon(resource_path('resources/icon/trash.ico')))
-
-
-        action = menu.exec_(
-            self.table.viewport().mapToGlobal(pos)
-        )
-
-        if action == update_action:
-            self.update_status(source_index)
+            update_action.setIcon(QIcon(resource_path('resources/icon/update.ico')))
+            open_status_action = menu.addAction(
+                "Open Status DB"
+            )
+            open_status_action.setIcon(QIcon(resource_path('resources/icon/open.ico')))
+            clear_all_status_action = menu.addAction(
+                "Clear All Status"
+            )
+            clear_all_status_action.setIcon(QIcon(resource_path('resources/icon/trash.ico')))
 
 
-        elif action == clear_all_status_action:
-            self.clear_all_status()
+            action = menu.exec_(
+                self.table.viewport().mapToGlobal(pos)
+            )
 
-        elif action == open_status_action:
-            self.open_status_file()
+            if action == update_action:
+                self.update_status(source_index)
+
+
+            elif action == clear_all_status_action:
+                self.clear_all_status()
+
+            elif action == open_status_action:
+                self.open_status_file()
+        else:
+            general_context_menu = QMenu(self)
+
+            summary_action = general_context_menu.addAction(
+                "Show summary"
+            )
+
+            summary_action.setIcon(QIcon(resource_path('resources/icon/update.ico')))
+
+            detail_action = general_context_menu.addAction(
+                "Show details"
+            )
+
+            detail_action.setIcon(QIcon(resource_path('resources/icon/update.ico')))
+
+            action = general_context_menu.exec_(
+                self.table.viewport().mapToGlobal(pos)
+            )
+
+            if action == summary_action:
+                self.show_alarm_summary(context_df)
+                #print(.info())
+
+            elif action == detail_action:
+                text = index.data(Qt.DisplayRole)
+                #print(text)
+                self.show_alarm_details(context_df, text)
+
+
+
+
+
+
 
     def restart_search_timer(self):
         self.search_timer.start()
@@ -877,3 +912,102 @@ class AlarmTable(QWidget):
             self.column_filter_edits.append(edit)
 
         self.update_filter_positions()
+
+
+    def get_dataframe(self):
+
+        return self.proxy.sourceModel().df.copy()
+
+    def show_alarm_summary(self, df):
+
+        if df.empty:
+            QMessageBox.information(
+                self,
+                "Summary",
+                "No rows available."
+            )
+            return
+
+        summary = (
+            df.groupby(
+                [
+                    "Supplementary Information",
+                    "Alarm Number",
+                    "Alarm Text",
+
+                ]
+            )
+            .size()
+            .reset_index(name="Count")
+            .sort_values(
+                "Count",
+                ascending=False
+            )
+        )
+
+        self.show_summary_dataframe(
+            summary,
+            "Alarm Summary"
+        )
+
+    def show_alarm_details(self, df, text):
+
+        if df.empty:
+            QMessageBox.information(
+                self,
+                "Summary",
+                "No rows available."
+            )
+            return
+
+        details = (
+            df[
+                df["Supplementary Information"] == text
+                ]
+            .sort_values(
+                "Alarm Number"
+            )
+            .reset_index(drop=True)
+        )
+
+        self.show_summary_dataframe(
+            details,
+            "Alarm Summary"
+        )
+
+
+    def show_summary_dataframe(self, df, title):
+
+        page = QWidget()
+
+        layout = QVBoxLayout(page)
+
+        table = AlarmTable(filename=self.filename)
+
+        layout.addWidget(table)
+
+        table.load_dataframe(
+            title,
+            df,
+            df,
+            "#fff2cc"
+        )
+
+        dlg = SummaryDialog(page)
+        dlg.setWindowTitle(title)
+        dlg.setWindowFlag(Qt.Window)
+        dlg.resize(1100, 700)
+        dlg.exec_()
+
+
+
+class SummaryDialog(QDialog):
+
+    def __init__(self, widget, parent=None):
+        super().__init__(parent)
+
+        self.setWindowTitle("Alarm Summary")
+        self.resize(1000, 700)
+
+        layout = QVBoxLayout(self)
+        layout.addWidget(widget)
