@@ -35,12 +35,20 @@ class PandasModel(QAbstractTableModel):
 
         self.row_color = color
 
+    # def build_search_cache(self):
+    #     self.search_cache = (
+    #         self.df.fillna("")
+    #         .astype(str)
+    #         .agg(" ".join, axis=1)
+    #         .str.lower()
+    #     )
     def build_search_cache(self):
-        self.search_cache = (
-            self.df.fillna("")
-            .astype(str)
-            .agg(" ".join, axis=1)
-            .str.lower()
+
+        df = self.df.fillna("")
+
+        self.search_cache = df.apply(
+            lambda row: " ".join(map(str, row)).lower(),
+            axis=1
         )
     def rowCount(self, parent=None):
         return len(self.df)
@@ -312,27 +320,47 @@ class GlobalFilterProxy(QSortFilterProxyModel):
         # GLOBAL SEARCH
         # ============================================
 
+        # if self.search_text:
+        #
+        #     row_text = " ".join(
+        #         str(df.iat[source_row, c]).lower()
+        #         for c in range(df.shape[1])
+        #     )
+        #
+        #     if any(
+        #         term in row_text
+        #         for term in self.search_negative
+        #     ):
+        #         return False
+        #
+        #     if (
+        #         self.search_positive
+        #         and not any(
+        #             term in row_text
+        #             for term in self.search_positive
+        #         )
+        #     ):
+        #         return False
+
         if self.search_text:
 
-            row_text = " ".join(
-                str(df.iat[source_row, c]).lower()
-                for c in range(df.shape[1])
-            )
+            row_text = model.search_cache.iat[source_row]
 
             if any(
-                term in row_text
-                for term in self.search_negative
+                    term in row_text
+                    for term in self.search_negative
             ):
                 return False
 
             if (
-                self.search_positive
-                and not any(
-                    term in row_text
-                    for term in self.search_positive
-                )
+                    self.search_positive
+                    and not any(
+                term in row_text
+                for term in self.search_positive
+            )
             ):
                 return False
+
 
         # ============================================
         # COLUMN FILTERS
